@@ -36,11 +36,11 @@ func init() {
 // runActions parses and executes the provided actions
 func runActions(cmd *cobra.Command, args []string) error {
 	conf := &uistrategy.UiStrategyConf{}
-	ui := uistrategy.New().WithLogger(logger(verbose))
 
 	if err := cmdutil.YamlParseInput(conf, path); err != nil {
 		return err
 	}
+	ui := uistrategy.New(conf.BaseConfig).WithLogger(logger(verbose))
 
 	return cmdutil.RunActions(ui, conf)
 }

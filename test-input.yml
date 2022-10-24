@@ -2,7 +2,57 @@ baseUrl: http://127.0.0.1:8090
 timeout: 30
 reuseBrowserCache: false
 auth:
-  username: ...
-  password: ddddd
-  actions:
-    - name: createCollection-1
+  navigate: /_/#/login
+  username: 
+    must: true
+    value: test@example.com
+    xPath: //*[@class="app-body"]/div[1]/main/div/form/div[2]/input
+  password:
+    must: true
+    value: P4s$w0rd123!
+    xPath: //*[@class="app-body"]/div[1]/main/div/form/div[3]/input
+  submit:
+    must: true
+    cssSelector: '#app > div > div > div.page-wrapper.full-page.center-content > main > div > form > button'    
+actions:
+  - name: create test collection
+    navigate: /_/?#/collections
+    elementActions: 
+      - name: Ceate new collection
+        element: 
+          cssSelector: '#app > div > div > div.page-wrapper.center-content > main > div > button'
+          clickSwipe: true
+      - name: Name it test
+        element: 
+          cssSelector: 'body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-header > form > div > input'
+          # by specifying a value here we ensure a Input occurs
+          value: test
+      - name: Save it
+        element: 
+          cssSelector: 'body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-header > form > div > input'
+      - name: Add New Field
+        element: 
+          cssSelector: 'body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-content > div > div > button'
+      - name: Name Field testField1
+        element: 
+          cssSelector: 'body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-content > div > div > div.accordions > div > div > form > div > div:nth-child(2) > div > input'
+          value: testField1
+      - name: Click Done
+        element: 
+          cssSelector: 'body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-content > div > div > div.accordions > div > div > form > div > div.col-sm-4.txt-right > div.inline-flex.flex-gap-sm.flex-nowrap > button.btn.btn-sm.btn-outline.btn-expanded-sm'
+      - name: Click Create Collection
+        element: 
+          cssSelector: 'body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-footer > button.btn.btn-expanded'
+
+
+
+# ---
+# # add users
+# baseUrl: http://127.0.0.1:8090
+# timeout: 30
+# reuseBrowserCache: false
+# auth:
+#   username: test@example.com
+#   password: 
+#   actions:
+#     - name: createCollection-1
