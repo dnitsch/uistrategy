@@ -22,7 +22,7 @@ type Element struct {
 type Auth struct {
 	Username        Element `yaml:"username" json:"username"`
 	Password        Element `yaml:"password" json:"password"`
-	ConfirmPassword Element `yaml:"confirmPassword,omitempty json:"confirmPassword,omitempty`
+	ConfirmPassword Element `yaml:"confirmPassword,omitempty" json:"confirmPassword,omitempty"`
 	RequireConfirm  bool    `yaml:"requireConfirm,omitempty" json:"requireConfirm,omitempty"`
 	Navigate        string  `yaml:"navigate" json:"navigate"`
 	Submit          Element `yaml:"submit" json:"submit"`
@@ -41,21 +41,21 @@ type WebConfig struct {
 	// you should also cache the default location of where the cache is:
 	// ~/.uistratetegy-data
 	PersistSessionOnDisk bool `yaml:"persist" json:"persist"`
+	// Timeout will initialises a copy of the page with a context Timeout
+	Timeout           int  `yaml:"timeout" json:"timeout"`
+	ReuseBrowserCache bool `yaml:"reuseBrowserCache" json:"reuseBrowserCache"`
 }
 
 // BaseConfig is the base config object
 // each web session will have its own go routine to run the entire session
 // Auth -> LoggedInPage ->[]Actions
 type BaseConfig struct {
-	BaseUrl string `yaml:"baseUrl" json:"baseUrl"`
-	// Timeout will initialises a copy of the page with a context Timeout
-	Timeout           int        `yaml:"timeout" json:"timeout"`
-	WebConfig         *WebConfig `yaml:"webConfig,omitempty" json:"webConfig,omitempty"`
-	ReuseBrowserCache bool       `yaml:"reuseBrowserCache" json:"reuseBrowserCache"`
+	BaseUrl   string     `yaml:"baseUrl" json:"baseUrl"`
+	WebConfig *WebConfig `yaml:"webConfig,omitempty" json:"webConfig,omitempty"`
 }
 
 type UiStrategyConf struct {
-	BaseConfig
+	Setup   BaseConfig   `yaml:"setup" json:"setup"`
 	Auth    Auth         `yaml:"auth" json:"auth"`
 	Actions []ViewAction `yaml:"actions" json:"actions"`
 }
@@ -100,7 +100,7 @@ func New(conf BaseConfig) *Web {
 	ddir := path.Join(util.HomeDir(), fmt.Sprintf(".%s-data", config.SELF_NAME))
 
 	l := launcher.New().
-		Set("proxy-server", "localhost:8888").
+		// Set("proxy-server", "localhost:8888").
 		Headless(false).
 		Devtools(false).
 		Leakless(true)

@@ -1,6 +1,7 @@
-baseUrl: http://127.0.0.1:8090
-timeout: 30
-reuseBrowserCache: false
+setup: 
+  baseUrl: http://127.0.0.1:8090
+  timeout: 30
+  reuseBrowserCache: false
 auth:
   navigate: /_/#/login
   username: 
