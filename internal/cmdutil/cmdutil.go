@@ -5,22 +5,35 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/dnitsch/configmanager"
+	"github.com/dnitsch/configmanager/pkg/generator"
 	"github.com/dnitsch/uistrategy"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 func RunActions(ui *uistrategy.Web, conf *uistrategy.UiStrategyConf) error {
 	if err := ui.Drive(context.Background(), conf.Auth, conf.Actions); len(err) > 0 {
-		return fmt.Errorf("%#v", err)
+		return fmt.Errorf("%+v", err)
 	}
 	return nil
 }
 
 // YamlParseInput will return a filled pointer with Unmarshalled data
-func YamlParseInput[T any](input *T, conf io.Reader) error {
+func YamlParseInput[T any](input *T, conf io.Reader, cm *configmanager.ConfigManager) error {
 	b, err := io.ReadAll(conf)
 	if err != nil {
 		return err
 	}
-	return yaml.Unmarshal(b, input)
+
+	if err := yaml.Unmarshal(b, input); err != nil {
+		return err
+	}
+	// use custom token separator inline with future releases
+	config := generator.NewConfig().WithTokenSeparator("://")
+	output, err := configmanager.RetrieveMarshalledYaml(input, cm, *config)
+	if err != nil {
+		return err
+	}
+	input = *output
+	return nil
 }

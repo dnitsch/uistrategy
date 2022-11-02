@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 
+	"github.com/dnitsch/configmanager"
 	log "github.com/dnitsch/simplelog"
 	"github.com/dnitsch/uistrategy"
 	"github.com/dnitsch/uistrategy/internal/cmdutil"
@@ -40,7 +41,10 @@ func runActions(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := cmdutil.YamlParseInput(conf, f); err != nil {
+
+	cm := &configmanager.ConfigManager{}
+
+	if err := cmdutil.YamlParseInput(conf, f, cm); err != nil {
 		return err
 	}
 	ui := uistrategy.New(conf.Setup).WithLogger(logger(verbose))
