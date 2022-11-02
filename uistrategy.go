@@ -80,7 +80,7 @@ type UiStrategyConf struct {
 	Setup BaseConfig `yaml:"setup" json:"setup"`
 	// Auth is optional
 	// should be omitted for apps that do not require a login
-	Auth    *Auth        `yaml:"auth,omitempty" json:"auth,omitempty"`
+	Auth    *Auth         `yaml:"auth,omitempty" json:"auth,omitempty"`
 	Actions []*ViewAction `yaml:"actions" json:"actions"`
 }
 
@@ -92,9 +92,9 @@ type ViewAction struct {
 	// report attr
 	message string `yaml:"-" json:"-"`
 
-	Name           string          `yaml:"name" json:"name"`
-	Navigate       string          `yaml:"navigate" json:"navigate"`
-	ElementActions []ElementAction `yaml:"elementActions" json:"elementActions"`
+	Name           string           `yaml:"name" json:"name"`
+	Navigate       string           `yaml:"navigate" json:"navigate"`
+	ElementActions []*ElementAction `yaml:"elementActions" json:"elementActions"`
 }
 
 type ElementAction struct {
@@ -178,7 +178,7 @@ func (web *Web) Drive(ctx context.Context, auth *Auth, allActions []*ViewAction)
 	// start driving in that session
 	for _, v := range allActions {
 		v = v.WithNavigate(web.config.BaseUrl)
-		if e := page.PerformActions(*v); e != nil {
+		if e := page.PerformActions(v); e != nil {
 			errs = append(errs, e)
 		}
 	}
@@ -233,7 +233,7 @@ func (web *Web) doAuth(auth Auth) (*LoggedInPage, error) {
 }
 
 // PerformAction handles a single action on Navigate'd page/view of SPA
-func (p *LoggedInPage) PerformActions(action ViewAction) error {
+func (p *LoggedInPage) PerformActions(action *ViewAction) error {
 
 	if err := p.page.Navigate(action.navigate); err != nil {
 		return err
@@ -257,38 +257,14 @@ func (p *LoggedInPage) PerformActions(action ViewAction) error {
 	return nil
 }
 
-// performAction handles finding the element and any related actions on it
-// i.e. click or input
-func (p *LoggedInPage) performAction(a ElementAction) []error {
-	rodElem, err := p.DetermineActionElement(a)
-	if err != nil {
-		p.log.Debugf("action: %s, errored with %#+v", a.Name, err)
-		// extend screenshots here
-		a.message = fmt.Sprintf("locating element with selector: %s, errored with %+v", *a.Element.Selector, err)
-		a.errored = true
-		a.screenshot = p.captureAndSave()
-		p.errors = append(p.errors, err)
-	}
-	a.message = fmt.Sprintf("found element: %s", *a.Element.Selector)
-	if err := p.DetermineActionType(a, rodElem); err != nil {
-		p.log.Debugf("action: %s, errored with %#+v", a.Name, err)
-		a.message = fmt.Sprintf("performing action on element with selector: %s, errored with %+v", *a.Element.Selector, err)
-		a.errored = true
-		a.screenshot = p.captureAndSave()
-		p.errors = append(p.errors, err)
-	}
-	a.errored = false
-	a.screenshot = ""
-	// also add results to Report outcome
-	return p.errors
-}
-
 // handleActionError returns a skip error and error depending on config set up
-func (p *LoggedInPage) handleActionError(a ElementAction, err []error) (bool, error) {
+func (p *LoggedInPage) handleActionError(a *ElementAction, err []error) (bool, error) {
 
-	if err != nil && p.config.ContinueOnError {
+	if len(err) > 0 && p.config.ContinueOnError {
 		p.log.Debugf("action: %#v, errored with %#+v", a, err)
 		p.log.Debugf("continue on error...")
+		a.errored = true
+		a.screenshot = p.captureAndSave()
 		return true, nil
 	}
 	if len(err) > 0 {
@@ -297,8 +273,35 @@ func (p *LoggedInPage) handleActionError(a ElementAction, err []error) (bool, er
 	return false, nil
 }
 
+// performAction handles finding the element and any related actions on it
+// i.e. click or input
+func (p *LoggedInPage) performAction(a *ElementAction) []error {
+	rodElem, err := p.DetermineActionElement(a)
+	a.errored = false
+	a.screenshot = ""
+	if err != nil {
+		p.log.Debugf("action: %s, errored with %+#v", a.Name, err)
+		// extend screenshots here
+		a.message = fmt.Sprintf("locating element with selector: %s, errored with %+#v", *a.Element.Selector, err)
+		a.errored = true
+		a.screenshot = p.captureAndSave()
+		p.errors = append(p.errors, err)
+	}
+	a.message = fmt.Sprintf("found element: %s", *a.Element.Selector)
+	if err := p.DetermineActionType(a, rodElem); err != nil {
+		p.log.Debugf("action: %s, errored with %v", a.Name, err)
+		a.message = fmt.Sprintf("performing action on element with selector: %s, errored with %+v", *a.Element.Selector, err)
+		a.errored = true
+		a.screenshot = p.captureAndSave()
+		p.errors = append(p.errors, err)
+	}
+
+	// also add results to Report outcome
+	return p.errors
+}
+
 // DetermineActionType returns the rod.Element with correct action
-func (lp *LoggedInPage) DetermineActionElement(action ElementAction) (*rod.Element, error) {
+func (lp *LoggedInPage) DetermineActionElement(action *ElementAction) (*rod.Element, error) {
 	return determinActionElement(lp, action.Element)
 }
 
@@ -335,6 +338,7 @@ func determinActionElement(lp *LoggedInPage, elem Element) (*rod.Element, error)
 		}
 		if exists {
 			// update report with success for step
+			lp.log.Debugf("found element using method: %v", k)
 			return felem, nil
 		}
 	}
@@ -347,7 +351,7 @@ func determinActionElement(lp *LoggedInPage, elem Element) (*rod.Element, error)
 // either Click/Swipe or Input
 // when Input is selected - ensure you have specified the input HTML element
 // as the enclosing elements may not always allow for input...
-func (lp *LoggedInPage) DetermineActionType(action ElementAction, elem *rod.Element) error {
+func (lp *LoggedInPage) DetermineActionType(action *ElementAction, elem *rod.Element) error {
 	if elem == nil {
 		if action.Assert {
 			// TODO: custom errors here
@@ -403,19 +407,7 @@ func (lp *LoggedInPage) captureAndSave() string {
 	return file
 }
 
-// func (lp *LoggedInPage) addViewReport(name, message string) []ViewReport {
-// 	vr := ViewReport{Name: name, Message: message}
-// 	lp.report = append(lp.report, vr)
-// 	return lp.report
-// }
-
-// func (lp *LoggedInPage) addActionReport(vr ViewReport, name, message, screenshot string, errored bool) ViewReport {
-// 	ar := ActionReport{Name: name, Message: message}
-// 	lp.report = append(lp.report, vr)
-// 	return vr
-// }
-
-func (web *Web) buildReport(allActions []ViewAction) {
+func (web *Web) buildReport(allActions []*ViewAction) {
 
 	vrs := []ViewReport{}
 	for _, v := range allActions {
@@ -439,7 +431,8 @@ func (web *Web) buildReport(allActions []ViewAction) {
 }
 
 func (web *Web) flushReport(report []ViewReport) error {
-	file := fmt.Sprintf(`.uistrategy/report.json`)
+	file := `.uistrategy/report.json`
+
 	w, err := os.OpenFile(file, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		web.log.Debugf("unable to get a writer: %v", err)

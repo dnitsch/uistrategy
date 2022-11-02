@@ -1,6 +1,6 @@
 NAME := uistrategy
 OWNER := dnitsch
-VERSION := "v0.0.0"
+VERSION := "v0.1.0"
 REVISION := $(shell git rev-parse --short HEAD)
 
 LDFLAGS := -ldflags="-s -w -X \"github.com/$(OWNER)/$(NAME)/cmd/uistrategy.Version=$(VERSION)\" -X \"github.com/$(OWNER)/$(NAME)/cmd/uistrategy.Revision=$(REVISION)\" -extldflags -static"
