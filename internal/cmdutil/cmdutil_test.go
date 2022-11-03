@@ -45,7 +45,7 @@ actions:
 				Setup: uistrategy.BaseConfig{
 					BaseUrl:         "http://127.0.0.1:8090",
 					ContinueOnError: true,
-					WebConfig:       nil,
+					LauncherConfig:  nil,
 				},
 				Auth: &uistrategy.Auth{
 					Navigate: "/_/#/login",
@@ -106,7 +106,7 @@ actions:
 				Setup: uistrategy.BaseConfig{
 					BaseUrl:         "http://127.0.0.1:8090",
 					ContinueOnError: false,
-					WebConfig:       nil,
+					LauncherConfig:  nil,
 				},
 				Auth: nil,
 				Actions: []uistrategy.ViewAction{

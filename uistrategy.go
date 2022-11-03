@@ -3,15 +3,12 @@ package uistrategy
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"image/png"
 	"os"
-	"path"
 	"time"
 
 	log "github.com/dnitsch/simplelog"
-	"github.com/dnitsch/uistrategy/internal/config"
 	"github.com/dnitsch/uistrategy/internal/util"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
@@ -24,15 +21,6 @@ type Element struct {
 	Value    *string `yaml:"value,omitempty" json:"value,omitempty"`
 	Must     bool    `yaml:"must" json:"must"`
 	Timeout  int
-}
-
-type Auth struct {
-	Username        Element `yaml:"username" json:"username"`
-	Password        Element `yaml:"password" json:"password"`
-	ConfirmPassword Element `yaml:"confirmPassword,omitempty" json:"confirmPassword,omitempty"`
-	RequireConfirm  bool    `yaml:"requireConfirm,omitempty" json:"requireConfirm,omitempty"`
-	Navigate        string  `yaml:"navigate" json:"navigate"`
-	Submit          Element `yaml:"submit" json:"submit"`
 }
 
 type ActionReport struct {
@@ -52,7 +40,7 @@ type LoggedInPage struct {
 	*Web
 	page   *rod.Page
 	errors []error
-	report []ViewReport
+	// report []ViewReport
 }
 
 type WebConfig struct {
@@ -63,8 +51,11 @@ type WebConfig struct {
 	// ~/.uistratetegy-data
 	PersistSessionOnDisk bool `yaml:"persist" json:"persist"`
 	// Timeout will initialises a copy of the page with a context Timeout
-	Timeout           int  `yaml:"timeout" json:"timeout"`
-	ReuseBrowserCache bool `yaml:"reuseBrowserCache" json:"reuseBrowserCache"`
+	Timeout           int    `yaml:"timeout" json:"timeout"`
+	BrowserPathExec   string `yaml:"execPath" json:"execPath"`
+	UserMode          bool   `yaml:"userMode" json:"userMode"`
+	DataDir           string `yaml:"dataDir" json:"dataDir"`
+	ReuseBrowserCache bool   `yaml:"reuseBrowserCache" json:"reuseBrowserCache"`
 }
 
 // BaseConfig is the base config object
@@ -72,7 +63,7 @@ type WebConfig struct {
 // Auth -> LoggedInPage ->[]Actions
 type BaseConfig struct {
 	BaseUrl         string     `yaml:"baseUrl" json:"baseUrl"`
-	WebConfig       *WebConfig `yaml:"webConfig,omitempty" json:"webConfig,omitempty"`
+	LauncherConfig  *WebConfig `yaml:"browserConfig,omitempty" json:"browserConfig,omitempty"`
 	ContinueOnError bool       `yaml:"continueOnError" json:"continueOnError"`
 }
 
@@ -90,8 +81,8 @@ type UiStrategyConf struct {
 type ViewAction struct {
 	navigate string `yaml:"-" json:"-"`
 	// report attr
-	message string `yaml:"-" json:"-"`
-
+	message        string           `yaml:"-" json:"-"`
+	Iframe         *string          `yaml:"iframe,omitempty" json:"iframe,omitempty"`
 	Name           string           `yaml:"name" json:"name"`
 	Navigate       string           `yaml:"navigate" json:"navigate"`
 	ElementActions []*ElementAction `yaml:"elementActions" json:"elementActions"`
@@ -128,7 +119,7 @@ type Web struct {
 // with the provided BaseConfig
 func New(conf BaseConfig) *Web {
 	_ = util.InitDirDeps()
-	url := newLauncher(conf.WebConfig).MustLaunch()
+	url := newLauncher(conf.LauncherConfig).MustLaunch()
 	browser := rod.New().
 		ControlURL(url).
 		MustConnect().NoDefaultDevice()
@@ -141,18 +132,31 @@ func New(conf BaseConfig) *Web {
 
 // newLauncher returns a launcher with specified properties
 func newLauncher(webconf *WebConfig) *launcher.Launcher {
-	ddir := path.Join(util.HomeDir(), fmt.Sprintf(".%s-data", config.SELF_NAME))
+	// ddir := path.Join(util.HomeDir(), fmt.Sprintf(".%s-data", config.SELF_NAME))
 
-	l := launcher.New().Leakless(true).Devtools(false).Headless(false)
+	l := launcher.New()
+
+	l.Leakless(true).Devtools(false).Headless(false)
 
 	if webconf != nil {
+		if webconf.UserMode {
+			l = launcher.NewUserMode()
+		}
+		if len(webconf.BrowserPathExec) > 0 {
+			if l != nil {
+				l.Bin(webconf.BrowserPathExec)
+			} else {
+				l = launcher.New().Bin(webconf.BrowserPathExec)
+			}
+		}
+		if len(webconf.DataDir) > 0 {
+			l.UserDataDir(webconf.DataDir)
+		}
 		if webconf.Headless {
 			l.Headless(true)
 		}
-		if webconf.PersistSessionOnDisk {
-			l.UserDataDir(ddir)
-		}
 	}
+
 	return l
 }
 
@@ -188,83 +192,59 @@ func (web *Web) Drive(ctx context.Context, auth *Auth, allActions []*ViewAction)
 	return errs
 }
 
-// DoAuth performs the required Authentication
-// in the browser and returns a authed Page
-func (web *Web) DoAuth(auth *Auth) (*LoggedInPage, error) {
-
-	if auth != nil {
-		return web.doAuth(*auth)
-	}
-	page := web.browser.MustPage(web.config.BaseUrl).MustWaitLoad()
-	report := []ViewReport{}
-	lp := &LoggedInPage{web, page, []error{}, report}
-	return lp, nil
-}
-
-// doAuth accepts a
-func (web *Web) doAuth(auth Auth) (*LoggedInPage, error) {
-	report := []ViewReport{}
-
-	page := web.browser.MustPage(web.config.BaseUrl + auth.Navigate).MustWaitLoad()
-	lp := &LoggedInPage{web, page, []error{}, report}
-
-	web.log.Debug("begin auth")
-	uname, err := determinActionElement(lp, auth.Username)
-	if err != nil {
-		web.log.Errorf("unable to find username field, by selector: %v", *auth.Username.Selector)
-		return nil, err
-	}
-	uname.MustInput(*auth.Username.Value)
-	passwd, err := determinActionElement(lp, auth.Password)
-	if err != nil {
-		web.log.Errorf("unable to find password field, by selector: %v", *auth.Username.Selector)
-		return nil, err
-	}
-	passwd.MustInput(*auth.Password.Value)
-	submit, err := determinActionElement(lp, auth.Submit)
-	if err != nil {
-		web.log.Errorf("unable to find password field, by selector: %v", *auth.Username.Selector)
-		return nil, err
-	}
-	submit.MustClick().MustWaitInvisible()
-	page.MustWaitLoad()
-	web.log.Debug("end auth")
-	return lp, nil
-}
-
 // PerformAction handles a single action on Navigate'd page/view of SPA
-func (p *LoggedInPage) PerformActions(action *ViewAction) error {
+func (lp *LoggedInPage) PerformActions(action *ViewAction) error {
 
-	if err := p.page.Navigate(action.navigate); err != nil {
+	actionPage := lp.page
+	waitNav := actionPage.MustWaitNavigation()
+	if err := actionPage.Navigate(action.navigate); err != nil {
 		return err
 	}
+	waitNav()
+	// lp.page.MustWaitIdle()
+	actionPage.MustWaitLoad()
 
 	action.message = fmt.Sprintf("successfully navigated to: %s", action.navigate)
-	p.page.MustWaitLoad()
-	p.log.Debugf("navigated to: %s", action.navigate)
+	lp.log.Debugf("navigated to: %s", action.navigate)
+
+	if action.Iframe != nil {
+		iframe, err := determinActionElement(lp.log, actionPage, Element{Selector: action.Iframe})
+		if err != nil {
+			return err
+		}
+		iframe.MustWaitLoad()
+		action.message = fmt.Sprintf("%s\n%s", action.message, "will perform following actions inside an iframe")
+		lp.page = iframe.MustFrame()
+	}
+
+	// lp.page.MustWaitIdle()
+	if err := rod.Try(func() { actionPage.WaitLoad() }); err != nil {
+		lp.log.Debugf("err on page load: %s", err.Error())
+	}
+
 	for _, a := range action.ElementActions {
 		// perform action
-		p.log.Debugf("starting to perform action: %s", a.Name)
+		lp.log.Debugf("starting to perform action: %s", a.Name)
 		// end perform action
-		if skip, e := p.handleActionError(a, p.performAction(a)); e != nil {
+		if skip, e := lp.handleActionError(actionPage, a, lp.performAction(actionPage, a)); e != nil {
 			if skip {
 				break
 			}
 			return e
 		}
-		p.log.Debugf("completed action: %s", a.Name)
+		lp.log.Debugf("completed action: %s", a.Name)
 	}
 	return nil
 }
 
 // handleActionError returns a skip error and error depending on config set up
-func (p *LoggedInPage) handleActionError(a *ElementAction, err []error) (bool, error) {
+func (p *LoggedInPage) handleActionError(page *rod.Page, a *ElementAction, err []error) (bool, error) {
 
 	if len(err) > 0 && p.config.ContinueOnError {
-		p.log.Debugf("action: %#v, errored with %#+v", a, err)
+		p.log.Debugf("action: %#v, errored with %v", a, err)
 		p.log.Debugf("continue on error...")
 		a.errored = true
-		a.screenshot = p.captureAndSave()
+		a.screenshot = p.captureAndSave(page)
 		return true, nil
 	}
 	if len(err) > 0 {
@@ -275,8 +255,8 @@ func (p *LoggedInPage) handleActionError(a *ElementAction, err []error) (bool, e
 
 // performAction handles finding the element and any related actions on it
 // i.e. click or input
-func (p *LoggedInPage) performAction(a *ElementAction) []error {
-	rodElem, err := p.DetermineActionElement(a)
+func (p *LoggedInPage) performAction(page *rod.Page, a *ElementAction) []error {
+	rodElem, err := p.DetermineActionElement(page, a)
 	a.errored = false
 	a.screenshot = ""
 	if err != nil {
@@ -284,7 +264,7 @@ func (p *LoggedInPage) performAction(a *ElementAction) []error {
 		// extend screenshots here
 		a.message = fmt.Sprintf("locating element with selector: %s, errored with %+#v", *a.Element.Selector, err)
 		a.errored = true
-		a.screenshot = p.captureAndSave()
+		a.screenshot = p.captureAndSave(page)
 		p.errors = append(p.errors, err)
 	}
 	a.message = fmt.Sprintf("found element: %s", *a.Element.Selector)
@@ -292,7 +272,7 @@ func (p *LoggedInPage) performAction(a *ElementAction) []error {
 		p.log.Debugf("action: %s, errored with %v", a.Name, err)
 		a.message = fmt.Sprintf("performing action on element with selector: %s, errored with %+v", *a.Element.Selector, err)
 		a.errored = true
-		a.screenshot = p.captureAndSave()
+		a.screenshot = p.captureAndSave(page)
 		p.errors = append(p.errors, err)
 	}
 
@@ -301,13 +281,13 @@ func (p *LoggedInPage) performAction(a *ElementAction) []error {
 }
 
 // DetermineActionType returns the rod.Element with correct action
-func (lp *LoggedInPage) DetermineActionElement(action *ElementAction) (*rod.Element, error) {
-	return determinActionElement(lp, action.Element)
+func (lp *LoggedInPage) DetermineActionElement(page *rod.Page, action *ElementAction) (*rod.Element, error) {
+	return determinActionElement(lp.log, page, action.Element)
 }
 
 // determinActionElement
-func determinActionElement(lp *LoggedInPage, elem Element) (*rod.Element, error) {
-	lp.log.Debugf("looking for element: %v", elem)
+func determinActionElement(log log.Loggeriface, page *rod.Page, elem Element) (*rod.Element, error) {
+	log.Debugf("looking for element: %+v", elem)
 	// when timeout is properly implemented
 	// we need to wrap it in Try as it will panic on timeout
 	// err := rod.Try(func() {
@@ -317,33 +297,35 @@ func determinActionElement(lp *LoggedInPage, elem Element) (*rod.Element, error)
 		return nil, fmt.Errorf("action must include selector")
 	}
 
-	type searchElemFunc func(selector string) (bool, *rod.Element, error)
+	type searchElemFunc func(selector string) (rod.Elements, error)
 	searchfuncs := []searchElemFunc{
-		func(selector string) (bool, *rod.Element, error) {
-			return lp.page.Has(selector)
+		func(selector string) (rod.Elements, error) {
+			return page.Elements(selector)
 		},
-		func(selector string) (bool, *rod.Element, error) {
-			return lp.page.HasX(selector)
+		func(selector string) (rod.Elements, error) {
+			return page.ElementsX(selector)
 		},
 		// TODO: add more types here e.g. regex
 		// func(selector string) (bool, *rod.Element, error) {
-		// 	return lp.page.HasR(selector)
+		// 	return page.HasR(selector)
 		// },
 	}
 	// NOTE: shove this in known length channel slice and range over that so that it's done in parallel
 	for k, searchEl := range searchfuncs {
-		exists, felem, err := searchEl(*elem.Selector)
+		felems, err := searchEl(*elem.Selector)
 		if err != nil {
-			lp.log.Debugf("not found element using method: %v", k)
+			log.Debugf("error: %v occured when looking for element: %v, using method: %v", err.Error(), *elem.Selector, k)
+
 		}
-		if exists {
+		if !felems.Empty() {
 			// update report with success for step
-			lp.log.Debugf("found element using method: %v", k)
-			return felem, nil
+			log.Debugf("found element using method: %v", k)
+			return felems.First(), nil
 		}
+		log.Debugf("not found element using method: %v", k)
 	}
 	// update report with error for step
-	lp.log.Debugf("not found element using any search method")
+	log.Debugf("not found element using any search method")
 	return nil, fmt.Errorf("element not found by selector: %v", *elem.Selector)
 }
 
@@ -372,24 +354,23 @@ func (lp *LoggedInPage) DetermineActionType(action *ElementAction, elem *rod.Ele
 		elem.MustSelectAllText().MustInput("").MustInput(*action.Element.Value)
 		return nil
 	}
-	// if Value is missing then click element
-	// simplified for now
+
 	// TODO: expand this into a more switch statement type implementation
 	// allow - double tap/click, swipe, etc..
 	elem.MustClick()
 	elem.MustWaitLoad() // when clicked we wait for a
-	// wait for networkIdle
-	// SPA or standard
+	// lp.page.MustWaitLoad()
+
 	return nil
 }
 
 // captureAndSave wil store the captured image under the .uistrategy/captures/*.png
 // it will swallow any errors and log them out
-func (lp *LoggedInPage) captureAndSave() string {
+func (lp *LoggedInPage) captureAndSave(page *rod.Page) string {
 	file := fmt.Sprintf(`.uistrategy/captures/%v.png`, time.Now().UnixNano())
-	b, err := lp.page.Screenshot(true, &proto.PageCaptureScreenshot{Format: "png", Clip: nil, FromSurface: true, Quality: util.Int(100)})
+	b, err := page.Screenshot(true, &proto.PageCaptureScreenshot{Format: "png", Clip: nil, FromSurface: true, Quality: util.Int(100)})
 	if err != nil {
-		lp.log.Debugf("failed to capture page: %+v", lp.page)
+		lp.log.Debugf("failed to capture page: %+v", page)
 	}
 
 	r := bytes.NewReader(b)
@@ -405,49 +386,6 @@ func (lp *LoggedInPage) captureAndSave() string {
 		lp.log.Debugf("failed to write screenshot: %v", err)
 	}
 	return file
-}
-
-func (web *Web) buildReport(allActions []*ViewAction) {
-
-	vrs := []ViewReport{}
-	for _, v := range allActions {
-		vr := ViewReport{
-			Name:    v.Name,
-			Message: v.message,
-		}
-		for _, a := range v.ElementActions {
-			va := ActionReport{
-				Name:       a.Name,
-				Message:    a.message,
-				Screenshot: a.screenshot,
-				Errored:    a.errored,
-			}
-			vr.Actions = append(vr.Actions, va)
-		}
-		vrs = append(vrs, vr)
-	}
-
-	web.flushReport(vrs)
-}
-
-func (web *Web) flushReport(report []ViewReport) error {
-	file := `.uistrategy/report.json`
-
-	w, err := os.OpenFile(file, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		web.log.Debugf("unable to get a writer: %v", err)
-		return err
-	}
-
-	b, err := json.Marshal(report)
-	if err != nil {
-		return err
-	}
-	if _, err := w.Write(b); err != nil {
-		web.log.Errorf("failed to write report: %v", err)
-		return err
-	}
-	return nil
 }
 
 // // DoRegistration performs the required registration

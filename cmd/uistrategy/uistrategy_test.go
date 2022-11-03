@@ -16,7 +16,7 @@ func Test_runActions_integration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			path = "../../test/integration.yml"
+			path = "../../.ignore-timesheets.yml"
 			verbose = true
 			if e := runActions(&cobra.Command{}, []string{}); e != nil {
 				t.Errorf("%v", e)
