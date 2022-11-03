@@ -9,8 +9,6 @@ Config driven UI driver for front end testing, target agnostic, stored in declar
 > Disclaimer:
 Part of strategy series :D - see [reststrategy](https://github.com/dnitsch/reststrategy) :wink: - there is a [module](https://github.com/dnitsch/reststrategy/tree/main/seeder) and a [published CLI](https://github.com/dnitsch/reststrategy/releases) which functions in a similar way for REST calls. Always prefer to use that for any kind of configuration/data seeding where possible!
 
-> Only use this for last resort programatic interaction with a web app and for **UI Testing**
-
 ## Features
 
 The program splits the instructions into a top level slice which includes a navigation to a part of the app where it will include all the actions against the elements present. 
