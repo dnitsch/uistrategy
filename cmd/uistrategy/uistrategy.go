@@ -17,7 +17,7 @@ var (
 	rootCmd = &cobra.Command{
 		Use:   "uistrategy",
 		RunE:  runActions,
-		Short: "executes a series of actions against a URL",
+		Short: "executes a series of actions against a setup config",
 		Long:  ``,
 	}
 )

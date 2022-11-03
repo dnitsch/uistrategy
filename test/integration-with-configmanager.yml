@@ -1,0 +1,59 @@
+# Sample application with login
+setup: 
+  baseUrl: http://127.0.0.1:8090
+  continueOnError: true
+auth:
+  navigate: /_/#/login
+  username: 
+    value: test@example.com
+    selector: //*[@class="app-body"]/div[1]/main/div/form/div[2]/input
+  password:
+    value: AWSSECRETS:///systemX/environment/appY-password
+    selector: //*[@class="app-body"]/div[1]/main/div/form/div[3]/input
+  submit:
+    selector: '#app > div > div > div.page-wrapper.full-page.center-content > main > div > form > button'
+actions:
+  - name: create test collection (idempotently)
+    navigate: /_/?#/collections
+    elementActions: 
+      - name: Ceate new collection - with 1 field
+        element: 
+          selector: '#app > div > div > div.page-wrapper.center-content > main > div > button'
+          clickSwipe: true
+      - name: Name it test
+        element: 
+          selector: 'body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-header > form > div > input'
+          # by specifying a value here we ensure a Input occurs
+          value: test
+          assert: false
+          # iframe: "id=foo"
+      - name: Save it
+        element: 
+          selector: 'body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-header > form > div > input'
+      - name: Add New Field
+        element: 
+          selector: 'body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-content > div > div > button'
+      - name: Name Field testField1
+        element: 
+          selector: 'body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-content > div > div > div.accordions > div > div > form > div > div:nth-child(2) > div > input'
+          value: testField1
+      - name: Click Done
+        element: 
+          selector: 'body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-content > div > div > div.accordions > div > div > form > div > div.col-sm-4.txt-right > div.inline-flex.flex-gap-sm.flex-nowrap > button.btn.btn-sm.btn-outline.btn-expanded-sm'
+      - name: Click Create Collection
+        element: 
+          selector: 'body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-footer > button.btn.btn-expanded'
+  - name: Add Fields to test collection
+    navigate: /_/?#/collections
+    elementActions: 
+      - name: assert collection test is created
+        element: 
+          selector: //*[@class='sidebar-content']/*[contains(., 'test')]/span
+          assert: true
+      - name: click test collection - just in case
+        element: 
+          selector: //*[@class='sidebar-content']/*[contains(., 'test')]/span
+      - name: assert field testField1 is created
+        element: 
+          selector: //*[@class='page-wrapper']//span[contains(., 'testField1')]
+          assert: true

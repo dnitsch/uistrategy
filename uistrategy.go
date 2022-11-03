@@ -320,17 +320,17 @@ func determinActionElement(lp *LoggedInPage, elem Element) (*rod.Element, error)
 	type searchElemFunc func(selector string) (bool, *rod.Element, error)
 	searchfuncs := []searchElemFunc{
 		func(selector string) (bool, *rod.Element, error) {
-			return lp.page.HasX(selector)
+			return lp.page.Has(selector)
 		},
 		func(selector string) (bool, *rod.Element, error) {
-			return lp.page.Has(selector)
+			return lp.page.HasX(selector)
 		},
 		// TODO: add more types here e.g. regex
 		// func(selector string) (bool, *rod.Element, error) {
 		// 	return lp.page.HasR(selector)
 		// },
 	}
-	// TODO: shove this in known length channel slice and range over that so that it's done in parallel
+	// NOTE: shove this in known length channel slice and range over that so that it's done in parallel
 	for k, searchEl := range searchfuncs {
 		exists, felem, err := searchEl(*elem.Selector)
 		if err != nil {
