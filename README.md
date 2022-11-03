@@ -32,12 +32,79 @@ Currently all the actions are performed against a single instance of the logged 
   - report.json - can be used in an HTML template creation, additionally JUnit or any other kind of format  can be parsed from that base.
 - [ConfigManager](https://github.com/dnitsch/configmanager) integrated for easy storage of secrets in YMLs that can be committed - see this [example](./test/integration-with-configmanager.yml) of a password for auth.
 
-As this is still in *beta* expect bugs and the interface to change
+As this is still in *beta* expect bugs and the interface to change. 
 
 >Improvement/Feature:
 
 - accept multiple yaml docs and run them in parallel.
 - allow composing of complete strategies from multiple YAML documents - AVOID 1k+ YAML lines
+
+## Configuration
+
+### `setup`
+
+Top level config item to initiate a webBrowser session
+
+#### `baseUrl`
+
+must be provided acts as a baseUrl for all navigations, including login.
+  
+#### `continueOnError`
+
+Default: false
+
+Will stop execution if an error occurs, useful to set this to 
+  true if a large execution sequence 
+
+### `auth`
+
+... 
+
+### `actions`
+
+Is a list of actions to execute - the order in which they are provided. 
+
+Single `action` block has the below structure, at this level the action is only a navigation action/view action. it can contain 0 or more `elementActions`
+
+#### `name` (required)
+
+Name of the view action - will be used in reports
+
+#### `navigate` (required)
+
+The path to append to the baseUrl to navigate to perform actions against elements on that page.
+
+>navigate string is appended to the baseUrl without any slashes - ensure you either specify the baseUrl with a trailing slash or all your `navigate`s should include a preceeding slash.
+
+#### `elementActions`
+
+list of actions to perform within the page/view, each `elementAction` has the following structure
+
+#### `name` (required)
+
+Name of the action on the element - will be used in reports
+
+#### `element` (required)
+
+the element to identifier - an object with below attrs
+
+##### `selector` (required)
+
+CSS or XPath style selector to attempt to locate the element on the page.
+
+if not found and running `continueOnError` mode the execution will move on to the next element in the sequence.
+
+##### `value` (optional)
+
+if value is not provided it will be a click type action, if value is provided it will be an input type action
+
+##### `assert` (bool)
+
+Defaults to false.
+
+When running in UI test mode only this should be set to true...
+
+When set to true elements presence is only asserted and any input/click actions will be skipped.
 
 ## Usage
 
