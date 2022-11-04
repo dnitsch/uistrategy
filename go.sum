@@ -41,6 +41,8 @@ github.com/cpuguy83/go-md2man/v2 v2.0.2/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46t
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/dnaeon/go-vcr v1.1.0 h1:ReYa/UBrRyQdant9B4fNHGoCNKw6qh6P0fsdGmZpR7c=
+github.com/dnitsch/configmanager v1.10.1 h1:Jc+KRSwCbZvoZ579NTf+yi+OtQ8xC2P6uR4G3W0Lmqw=
+github.com/dnitsch/configmanager v1.10.1/go.mod h1:tTRID3zQ0WPQXjkfXljoDneAytYZuckj/TjLtBMoh9o=
 github.com/dnitsch/simplelog v1.5.1 h1:PhIFuZluJIAUiKgJ+xBzTZwqe49PFg20d3ToDucu3Dg=
 github.com/dnitsch/simplelog v1.5.1/go.mod h1:scPvWULBlruthxS6seGJkMbc1DM5f44IRZNmaSZCJVU=
 github.com/go-rod/rod v0.112.0 h1:U9Yc+quw4hxZ6GrdbWFBeylvaYElEKM9ijFW2LYkGlA=

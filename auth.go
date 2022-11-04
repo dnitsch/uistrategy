@@ -68,6 +68,7 @@ func (web *Web) doIdpAuth(auth Auth) (*LoggedInPage, error) {
 		return nil, err
 	}
 	page.MustWaitLoad()
+	waitNav := page.MustWaitNavigation()
 	// if MFA needs to be triggered and when not done automatically
 	if auth.MfaSelector != nil {
 		mfaSelect, err := determinActionElement(lp.log, page, *auth.MfaSelector)
@@ -81,6 +82,8 @@ func (web *Web) doIdpAuth(auth Auth) (*LoggedInPage, error) {
 			lp.log.Debugf("error waiting on invisible: %v", err)
 		}
 	}
+	waitNav()
+	page.MustWaitLoad()
 	web.log.Debug("end auth")
 	return lp, nil
 }

@@ -76,6 +76,32 @@ The path to append to the baseUrl to navigate to perform actions against element
 
 >navigate string is appended to the baseUrl without any slashes - ensure you either specify the baseUrl with a trailing slash or all your `navigate`s should include a preceeding slash.
 
+#### `iframe` (optional)
+
+object with following properties. when the actions you want to perform on that page/view are within an iframe it must be specifed here
+
+##### `selector`
+
+the selector for the iframe - using either CSS or Xpath e.g.: `(//*/iframe)[1]` - i.e. give me the first iframe on the page
+
+##### `waitEval`
+
+oftentimes older apps (e.g. timesheet portals :wink: ) include iframes and they are often loaded slower to avoid losing the context, specify the eval to wait for contents inside the iframe. 
+
+this could be a `myVar !== null` - more info in the godoc or below.
+
+```go
+// IframeAction 
+type IframeAction struct {
+  Selector string `yaml:"selector,omitempty" json:"selector,omitempty"`
+  // WaitEval has to be in the form of a boolean return
+  // e.g. `myVar !== null` or `(myVar !== null || document.title == "ready")`
+  // the supplied value will be appended to an existing
+  // `return document.readyState === 'complete' && ${WaitEval};`
+  WaitEval string `yaml:"waitEval,omitempty" json:"waitEval,omitempty"`
+}
+```
+
 #### `elementActions`
 
 list of actions to perform within the page/view, each `elementAction` has the following structure

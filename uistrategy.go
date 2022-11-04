@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"image/png"
+	"net/url"
 	"os"
 	"time"
 
@@ -65,6 +66,7 @@ type BaseConfig struct {
 	BaseUrl         string     `yaml:"baseUrl" json:"baseUrl"`
 	LauncherConfig  *WebConfig `yaml:"browserConfig,omitempty" json:"browserConfig,omitempty"`
 	ContinueOnError bool       `yaml:"continueOnError" json:"continueOnError"`
+	IsSinglePageApp bool       `yaml:"isSinglePageApp" json:"isSinglePageApp"`
 }
 
 type UiStrategyConf struct {
@@ -82,12 +84,23 @@ type ViewAction struct {
 	navigate string `yaml:"-" json:"-"`
 	// report attr
 	message        string           `yaml:"-" json:"-"`
-	Iframe         *string          `yaml:"iframe,omitempty" json:"iframe,omitempty"`
+	Iframe         *IframeAction    `yaml:"iframe,omitempty" json:"iframe,omitempty"`
 	Name           string           `yaml:"name" json:"name"`
 	Navigate       string           `yaml:"navigate" json:"navigate"`
 	ElementActions []*ElementAction `yaml:"elementActions" json:"elementActions"`
 }
 
+// IframeAction 
+type IframeAction struct {
+	Selector string `yaml:"selector,omitempty" json:"selector,omitempty"`
+	// WaitEval has to be in the form of a boolean return
+	// e.g. `myVar !== null` or `(myVar !== null || document.title == "ready")`
+	// the supplied value will be appended to an existing
+	// `return document.readyState === 'complete' && ${WaitEval};`
+	WaitEval string `yaml:"waitEval,omitempty" json:"waitEval,omitempty"`
+}
+
+// ElementAction
 type ElementAction struct {
 	Name    string  `yaml:"name" json:"name"`
 	Element Element `yaml:"element" json:"element"`
@@ -194,33 +207,22 @@ func (web *Web) Drive(ctx context.Context, auth *Auth, allActions []*ViewAction)
 
 // PerformAction handles a single action on Navigate'd page/view of SPA
 func (lp *LoggedInPage) PerformActions(action *ViewAction) error {
-
-	actionPage := lp.page
-	waitNav := actionPage.MustWaitNavigation()
-	if err := actionPage.Navigate(action.navigate); err != nil {
+	actionPage, err := lp.navigateHelper(lp.page, action)
+	if err != nil {
 		return err
 	}
-	waitNav()
-	// lp.page.MustWaitIdle()
-	actionPage.MustWaitLoad()
 
-	action.message = fmt.Sprintf("successfully navigated to: %s", action.navigate)
 	lp.log.Debugf("navigated to: %s", action.navigate)
 
 	if action.Iframe != nil {
-		iframe, err := determinActionElement(lp.log, actionPage, Element{Selector: action.Iframe})
+		iframe, err := lp.ensureIframeLoaded(actionPage, action)
 		if err != nil {
 			return err
 		}
-		iframe.MustWaitLoad()
-		action.message = fmt.Sprintf("%s\n%s", action.message, "will perform following actions inside an iframe")
-		lp.page = iframe.MustFrame()
+		actionPage = iframe
 	}
 
-	// lp.page.MustWaitIdle()
-	if err := rod.Try(func() { actionPage.WaitLoad() }); err != nil {
-		lp.log.Debugf("err on page load: %s", err.Error())
-	}
+	actionPage.MustWaitLoad()
 
 	for _, a := range action.ElementActions {
 		// perform action
@@ -232,9 +234,68 @@ func (lp *LoggedInPage) PerformActions(action *ViewAction) error {
 			}
 			return e
 		}
+		lp.errors = []error{}
 		lp.log.Debugf("completed action: %s", a.Name)
 	}
 	return nil
+}
+
+// navigateHelper ensures page is navigated to and waited sufficient time to ensure
+func (lp *LoggedInPage) navigateHelper(page *rod.Page, action *ViewAction) (*rod.Page, error) {
+	lp.log.Debug(page.MustInfo().URL)
+	//
+	targetUrl, err := url.Parse(action.navigate)
+	if err != nil {
+		return nil, err
+	}
+	currentUrl, err := url.Parse(page.MustInfo().URL)
+	if err != nil {
+		return nil, err
+	}
+	lp.log.Debugf("targetUrl: %v", targetUrl)
+	lp.log.Debugf("currentUrl: %v", currentUrl)
+
+	// classic applications need to perform full page postbacks
+	// more often than SPAs
+	// There is a isSPA flag - but currently not used
+	if currentUrl.Path != targetUrl.Path {
+		waitNav := page.MustWaitNavigation()
+		page.MustNavigate(action.navigate)
+		waitNav()
+	}
+
+	page.MustWaitIdle()
+	page.MustWaitLoad()
+
+	action.message = fmt.Sprintf("successfully navigated to: %s", action.navigate)
+
+	return page, nil
+}
+
+// ensureIframeLoaded returns an instnace of a pointer to a rod.Page
+// which is a document tree inside an iframe
+func (lp *LoggedInPage) ensureIframeLoaded(page *rod.Page, action *ViewAction) (*rod.Page, error) {
+	iframe, err := determinActionElement(lp.log, page, Element{Selector: &action.Iframe.Selector})
+	if err != nil {
+		return nil, err
+	}
+	iframe.MustWaitLoad()
+
+	action.message = fmt.Sprintf("%s\n%s", action.message, "will perform following actions inside an iframe")
+
+	page = iframe.MustFrame()
+	page.MustWaitLoad()
+
+	page.MustWait(fmt.Sprintf(`() => { console.log("trying to look for elements in iframe page");
+		try {
+			return document.readyState === 'complete' && %s;
+		} catch (ex) {
+			console.log("failed eval", ex.message)
+			return false
+		}
+	}`, action.Iframe.WaitEval))
+
+	return page, nil
 }
 
 // handleActionError returns a skip error and error depending on config set up
@@ -296,7 +357,7 @@ func determinActionElement(log log.Loggeriface, page *rod.Page, elem Element) (*
 		//
 		return nil, fmt.Errorf("action must include selector")
 	}
-
+	page.MustWaitLoad()
 	type searchElemFunc func(selector string) (rod.Elements, error)
 	searchfuncs := []searchElemFunc{
 		func(selector string) (rod.Elements, error) {
@@ -364,10 +425,10 @@ func (lp *LoggedInPage) DetermineActionType(action *ElementAction, elem *rod.Ele
 	return nil
 }
 
-// captureAndSave wil store the captured image under the .uistrategy/captures/*.png
+// captureAndSave wil store the captured image under the .report/captures/*.png
 // it will swallow any errors and log them out
 func (lp *LoggedInPage) captureAndSave(page *rod.Page) string {
-	file := fmt.Sprintf(`.uistrategy/captures/%v.png`, time.Now().UnixNano())
+	file := fmt.Sprintf(`.report/captures/%v.png`, time.Now().UnixNano())
 	b, err := page.Screenshot(true, &proto.PageCaptureScreenshot{Format: "png", Clip: nil, FromSurface: true, Quality: util.Int(100)})
 	if err != nil {
 		lp.log.Debugf("failed to capture page: %+v", page)

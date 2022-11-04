@@ -8,7 +8,6 @@ import (
 	"github.com/dnitsch/configmanager"
 	"github.com/dnitsch/configmanager/pkg/generator"
 	"github.com/dnitsch/uistrategy"
-	"gopkg.in/yaml.v3"
 )
 
 func RunActions(ui *uistrategy.Web, conf *uistrategy.UiStrategyConf) error {
@@ -25,15 +24,13 @@ func YamlParseInput[T any](input *T, conf io.Reader, cm *configmanager.ConfigMan
 		return err
 	}
 
-	if err := yaml.Unmarshal(b, input); err != nil {
-		return err
-	}
+	// if err := yaml.Unmarshal(b, input); err != nil {
+	// 	return err
+	// }
 	// use custom token separator inline with future releases
 	config := generator.NewConfig().WithTokenSeparator("://")
-	output, err := configmanager.RetrieveMarshalledYaml(input, cm, *config)
-	if err != nil {
+	if _, err := configmanager.RetrieveUnmarshalledFromYaml(b, input, cm, *config); err != nil {
 		return err
 	}
-	input = *output
 	return nil
 }

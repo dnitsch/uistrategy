@@ -29,7 +29,7 @@ func (web *Web) buildReport(allActions []*ViewAction) {
 }
 
 func (web *Web) flushReport(report []ViewReport) error {
-	file := `.uistrategy/report.json`
+	file := `.report/report.json`
 
 	w, err := os.OpenFile(file, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {

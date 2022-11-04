@@ -19,7 +19,7 @@ func WriteDataDir(datadir string) {
 }
 
 func InitDirDeps() error {
-	basePath := filepath.Join(".", ".uistrategy", "captures")
+	basePath := filepath.Join(".", ".report", "captures")
 	return os.MkdirAll(basePath, os.ModePerm)
 }
 

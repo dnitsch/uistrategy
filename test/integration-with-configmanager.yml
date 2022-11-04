@@ -2,13 +2,14 @@
 setup: 
   baseUrl: http://127.0.0.1:8090
   continueOnError: true
+  isSinglePageApp: true
 auth:
   navigate: /_/#/login
   username: 
     value: test@example.com
     selector: //*[@class="app-body"]/div[1]/main/div/form/div[2]/input
   password:
-    value: AWSSECRETS:///systemX/environment/appY-password
+    value: AWSPARAMSTR:///systemX/environment/appY-password
     selector: //*[@class="app-body"]/div[1]/main/div/form/div[3]/input
   submit:
     selector: '#app > div > div > div.page-wrapper.full-page.center-content > main > div > form > button'

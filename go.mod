@@ -2,10 +2,7 @@ module github.com/dnitsch/uistrategy
 
 go 1.19
 
-require (
-	github.com/go-rod/rod v0.112.0
-	gopkg.in/yaml.v3 v3.0.1
-)
+require github.com/go-rod/rod v0.112.0
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.1.1 // indirect
@@ -41,10 +38,11 @@ require (
 	golang.org/x/net v0.0.0-20220425223048-2871e0cb64e4 // indirect
 	golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e // indirect
 	golang.org/x/text v0.3.7 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 require (
-	github.com/dnitsch/configmanager v1.10.0
+	github.com/dnitsch/configmanager v1.10.1
 	github.com/dnitsch/simplelog v1.5.1
 	github.com/spf13/cobra v1.6.0
 	github.com/ysmood/goob v0.4.0 // indirect
@@ -52,4 +50,4 @@ require (
 	github.com/ysmood/leakless v0.8.0 // indirect
 )
 
-replace github.com/dnitsch/configmanager v1.10.0 => ../configmanager
+// replace github.com/dnitsch/configmanager v1.10.0 => ../configmanager

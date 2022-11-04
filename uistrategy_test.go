@@ -37,11 +37,11 @@ var (
 			Selector: util.Str(`#app > div > div > div.page-wrapper.full-page.center-content > main > div > form > button`),
 		},
 	}
-	testActions = []ViewAction{
+	testActions = []*ViewAction{
 		{
 			Name:     "create test collection",
 			Navigate: `/_/?#/collections`,
-			ElementActions: []ElementAction{{
+			ElementActions: []*ElementAction{{
 				Name: "create new collection",
 				Element: Element{
 					Must:     false,
@@ -133,7 +133,7 @@ func Test_Drive(t *testing.T) {
 		name string
 		auth *Auth
 
-		actions []ViewAction
+		actions []*ViewAction
 		web     *Web
 	}{
 		{
@@ -186,40 +186,43 @@ func Test_NoAuthSimulate(t *testing.T) {
 		name string
 		auth *Auth
 
-		actions []ViewAction
+		actions []*ViewAction
 		web     *Web
 	}{
 		{
 			name: "happy path - no error - stop on error",
 			auth: nil,
 			web:  New(BaseConfig{BaseUrl: ts.URL, ContinueOnError: false}).WithLogger(l),
-			actions: []ViewAction{{
-				Name:     "create test collection",
-				Navigate: `/route`,
-				ElementActions: []ElementAction{{
-					Name:   "asset collection is created and present in sidebar",
-					Assert: true,
-					Element: Element{
-						Must:     false,
-						Selector: util.Str(`//*[@class='sidebar-content']/*[contains(., 'test')]/span`),
-					},
-				},
-					{
-						Name: "click test collection - just in case",
-						Element: Element{
-							Must:     false,
-							Selector: util.Str(`//*[@class='sidebar-content']/*[contains(., 'test')]/span`),
-						}},
-					{
-						Name: "assert field testField1 is created",
-						Element: Element{
-							Must:     false,
-							Selector: util.Str(`//*[@class='page-wrapper']//span[contains(., 'testField1')]`),
+			actions: []*ViewAction{
+				{
+					Name:     "create test collection",
+					Navigate: `/route`,
+					ElementActions: []*ElementAction{
+						{
+							Name:   "asset collection is created and present in sidebar",
+							Assert: true,
+							Element: Element{
+								Must:     false,
+								Selector: util.Str(`//*[@class='sidebar-content']/*[contains(., 'test')]/span`),
+							},
 						},
-						Assert: true,
+						{
+							Name: "click test collection - just in case",
+							Element: Element{
+								Must:     false,
+								Selector: util.Str(`//*[@class='sidebar-content']/*[contains(., 'test')]/span`),
+							},
+						},
+						{
+							Name: "assert field testField1 is created",
+							Element: Element{
+								Must:     false,
+								Selector: util.Str(`//*[@class='page-wrapper']//span[contains(., 'testField1')]`),
+							},
+							Assert: true,
+						},
 					},
-				},
-			}},
+				}},
 		}}
 
 	for _, tt := range tests {
