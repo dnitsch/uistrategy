@@ -1,6 +1,7 @@
 NAME := uistrategy
 OWNER := dnitsch
-VERSION := "v0.1.1"
+GIT_TAG := "0.1.2"
+VERSION := "v$(GIT_TAG)"
 REVISION := $(shell git rev-parse --short HEAD)
 
 LDFLAGS := -ldflags="-s -w -X \"github.com/$(OWNER)/$(NAME)/cmd/uistrategy.Version=$(VERSION)\" -X \"github.com/$(OWNER)/$(NAME)/cmd/uistrategy.Revision=$(REVISION)\" -extldflags -static"
@@ -27,6 +28,10 @@ bingen:
 build: clean install bingen
 
 build_ci: clean install_ci bingen
+
+tag: 
+	git tag "v$(GIT_TAG)"
+	git push origin "v$(GIT_TAG)"
 
 release:
 	OWNER=$(OWNER) NAME=$(NAME) PAT=$(PAT) VERSION=$(VERSION) . hack/release.sh 
