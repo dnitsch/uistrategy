@@ -1,6 +1,6 @@
 NAME := uistrategy
 OWNER := dnitsch
-GIT_TAG := "0.1.2"
+GIT_TAG := "0.1.3"
 VERSION := "v$(GIT_TAG)"
 REVISION := $(shell git rev-parse --short HEAD)
 
@@ -35,3 +35,7 @@ tag:
 
 release:
 	OWNER=$(OWNER) NAME=$(NAME) PAT=$(PAT) VERSION=$(VERSION) . hack/release.sh 
+
+# build tag release
+btr: build tag release
+	echo "ran build tag release"
