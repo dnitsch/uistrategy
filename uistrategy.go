@@ -90,7 +90,7 @@ type ViewAction struct {
 	ElementActions []*ElementAction `yaml:"elementActions" json:"elementActions"`
 }
 
-// IframeAction 
+// IframeAction
 type IframeAction struct {
 	Selector string `yaml:"selector,omitempty" json:"selector,omitempty"`
 	// WaitEval has to be in the form of a boolean return
@@ -275,6 +275,10 @@ func (lp *LoggedInPage) navigateHelper(page *rod.Page, action *ViewAction) (*rod
 // ensureIframeLoaded returns an instnace of a pointer to a rod.Page
 // which is a document tree inside an iframe
 func (lp *LoggedInPage) ensureIframeLoaded(page *rod.Page, action *ViewAction) (*rod.Page, error) {
+	// allow for extremely slow iframe and page loads
+	// search the page for iframe element and then apply selector
+	page.MustSearch("iframe")
+
 	iframe, err := determinActionElement(lp.log, page, Element{Selector: &action.Iframe.Selector})
 	if err != nil {
 		return nil, err
@@ -284,13 +288,14 @@ func (lp *LoggedInPage) ensureIframeLoaded(page *rod.Page, action *ViewAction) (
 	action.message = fmt.Sprintf("%s\n%s", action.message, "will perform following actions inside an iframe")
 
 	page = iframe.MustFrame()
-	page.MustWaitLoad()
+	// page.MustWaitLoad()
 
-	page.MustWait(fmt.Sprintf(`() => { console.log("trying to look for elements in iframe page");
+	page.MustWait(fmt.Sprintf(`() => { 
+		console.log("trying to look for elements in iframe page");
 		try {
 			return document.readyState === 'complete' && %s;
 		} catch (ex) {
-			console.log("failed eval", ex.message)
+			console.log("failed wait iframe eval", ex.message)
 			return false
 		}
 	}`, action.Iframe.WaitEval))
@@ -407,6 +412,7 @@ func (lp *LoggedInPage) DetermineActionType(action *ElementAction, elem *rod.Ele
 	if elem != nil && action.Assert {
 		// update report with step found
 		// item found not performing action
+		lp.log.Debug("assert only returning early")
 		return nil
 	}
 	// if Value is present on the actionElement then always give preference
@@ -419,8 +425,9 @@ func (lp *LoggedInPage) DetermineActionType(action *ElementAction, elem *rod.Ele
 	// TODO: expand this into a more switch statement type implementation
 	// allow - double tap/click, swipe, etc..
 	elem.MustClick()
+	// action hover
+
 	elem.MustWaitLoad() // when clicked we wait for a
-	// lp.page.MustWaitLoad()
 
 	return nil
 }

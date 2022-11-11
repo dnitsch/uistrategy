@@ -1,6 +1,6 @@
 NAME := uistrategy
 OWNER := dnitsch
-GIT_TAG := "0.1.3"
+GIT_TAG := "0.2.0"
 VERSION := "v$(GIT_TAG)"
 REVISION := $(shell git rev-parse --short HEAD)
 
