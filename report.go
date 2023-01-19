@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-func (web *Web) buildReport(allActions []*ViewAction) {
+func (web *Web) buildReport(allActions []ViewAction) {
 
 	vrs := []ViewReport{}
 	for _, v := range allActions {

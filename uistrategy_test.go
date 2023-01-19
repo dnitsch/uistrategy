@@ -41,7 +41,7 @@ var (
 		{
 			Name:     "create test collection",
 			Navigate: `/_/?#/collections`,
-			ElementActions: []*ElementAction{{
+			ElementActions: []ElementAction{{
 				Name: "create new collection",
 				Element: Element{
 					Must:     false,

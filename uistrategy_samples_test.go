@@ -1,7 +1,6 @@
 package uistrategy
 
-var (
-	testHtml_style = []byte(`<html lang="en"><head><style>.ͼ1.cm-editor.cm-focused {outline: 1px dotted #212121;}
+var testHtml_style = []byte(`<html lang="en"><head><style>.ͼ1.cm-editor.cm-focused {outline: 1px dotted #212121;}
 .ͼ1.cm-editor {position: relative !important; box-sizing: border-box; display: flex !important; flex-direction: column;}
 .ͼ1 .cm-scroller {display: flex !important; align-items: flex-start !important; font-family: monospace; line-height: 1.4; height: 100%; overflow-x: auto; position: relative; z-index: 0;}
 .ͼ1 .cm-content[contenteditable=true] {-webkit-user-modify: read-write-plaintext-only;}
@@ -143,7 +142,8 @@ var (
 
 
 <div class="overlays"><div class="overlay-panel-wrapper" style=""></div><div class="overlay-panel-wrapper" style=""></div><div class="overlay-panel-wrapper" style=""></div><div class="overlay-panel-wrapper" style=""></div><div class="overlay-panel-wrapper" style=""></div><div class="overlay-panel-wrapper" style=""></div><div class="overlay-panel-wrapper" style=""></div></div><div class="app-tooltip"></div></body></html>`)
-	testHtml_noStyle = []byte(`<html lang="en"><head>
+
+var testHtml_noStyle = []byte(`<html lang="en"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' http://127.0.0.1:* data:; connect-src 'self' http://127.0.0.1:*; script-src 'self' 'sha256-GRUzBA7PzKYug7pqxv5rJaec5bwDCw1Vo6/IXwvD3Tc='">
@@ -176,4 +176,3 @@ var (
 
 
 <div class="overlays"><div class="overlay-panel-wrapper" style=""></div><div class="overlay-panel-wrapper" style=""></div><div class="overlay-panel-wrapper" style=""></div><div class="overlay-panel-wrapper" style=""></div><div class="overlay-panel-wrapper" style=""></div><div class="overlay-panel-wrapper" style=""></div><div class="overlay-panel-wrapper" style=""></div></div><div class="app-tooltip"></div></body></html>`)
-)

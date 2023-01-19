@@ -16,7 +16,7 @@ actions:
   - name: create test collection (idempotently)
     navigate: /_/?#/collections
     elementActions: 
-      - name: Ceate new collection - with 1 field
+      - name: Ceate new collection - with 1 field - brand new set up
         element: 
           selector: '#app > div > div > div.page-wrapper.center-content > main > div > button'
           clickSwipe: true
@@ -26,7 +26,6 @@ actions:
           # by specifying a value here we ensure a Input occurs
           value: test
           assert: false
-          # iframe: "id=foo"
       - name: Save it
         element: 
           selector: 'body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-header > form > div > input'
@@ -43,6 +42,39 @@ actions:
       - name: Click Create Collection
         element: 
           selector: 'body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-footer > button.btn.btn-expanded'
+  - name: create test2 collection from
+    navigate: /_/?#/collections
+    elementActions: 
+      - name: Ceate new collection from side menu - with 1 field
+        element: 
+          selector: //*/span[text()[contains(., 'New collection')]]
+          clickSwipe: true
+      - name: Name it test-table-2
+        element: 
+          selector: //*/h4[contains(text(),"New collection")]/following-sibling::form//*/input
+          # by specifying a value here we ensure a Input occurs
+          value: test-table-2
+          assert: false
+      - name: Add New Field - sample2
+        element: 
+          selector: //*/span[text()[contains(., 'New field')]]
+      - name: Expand Type
+        element: 
+          selector: //*[@class="select field-type-select"]
+      - name: Click email Type
+        element: 
+          selector: //*/div[@class="options-list"]//*[text() ="Email"]
+      - name: Fill in email
+        element: 
+          selector: //*/span[@class="txt"][text() ="Name"]/../../input
+          value: emailField
+      - name: Click Done
+        element: 
+          selector: //*/span[@class="txt"][text() ="Done"]/..
+      - name: Click Create Collection
+        element: 
+          selector: //*/span[@class="txt"][text() ="Create"]/..
+
   - name: Add Fields to test collection
     navigate: /_/?#/collections
     elementActions: 

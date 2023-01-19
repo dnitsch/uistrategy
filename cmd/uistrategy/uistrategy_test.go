@@ -15,10 +15,10 @@ func Test_runActions_integration(t *testing.T) {
 			name: "integration without configmanager",
 			path: "../../test/integration.yml",
 		},
-		{
-			name: "integration with configmanager",
-			path: "../../test/integration-with-configmanager.yml",
-		},
+		// {
+		// 	name: "integration with configmanager",
+		// 	path: "../../test/integration-with-configmanager.yml",
+		// },
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

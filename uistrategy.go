@@ -73,8 +73,8 @@ type UiStrategyConf struct {
 	Setup BaseConfig `yaml:"setup" json:"setup"`
 	// Auth is optional
 	// should be omitted for apps that do not require a login
-	Auth    *Auth         `yaml:"auth,omitempty" json:"auth,omitempty"`
-	Actions []*ViewAction `yaml:"actions" json:"actions"`
+	Auth    *Auth        `yaml:"auth,omitempty" json:"auth,omitempty"`
+	Actions []ViewAction `yaml:"actions" json:"actions"`
 }
 
 // ViewAction defines a single action to do
@@ -83,11 +83,11 @@ type UiStrategyConf struct {
 type ViewAction struct {
 	navigate string `yaml:"-" json:"-"`
 	// report attr
-	message        string           `yaml:"-" json:"-"`
-	Iframe         *IframeAction    `yaml:"iframe,omitempty" json:"iframe,omitempty"`
-	Name           string           `yaml:"name" json:"name"`
-	Navigate       string           `yaml:"navigate" json:"navigate"`
-	ElementActions []*ElementAction `yaml:"elementActions" json:"elementActions"`
+	message        string          `yaml:"-" json:"-"`
+	Iframe         *IframeAction   `yaml:"iframe,omitempty" json:"iframe,omitempty"`
+	Name           string          `yaml:"name" json:"name"`
+	Navigate       string          `yaml:"navigate" json:"navigate"`
+	ElementActions []ElementAction `yaml:"elementActions" json:"elementActions"`
 }
 
 // IframeAction
@@ -102,9 +102,10 @@ type IframeAction struct {
 
 // ElementAction
 type ElementAction struct {
-	Name    string  `yaml:"name" json:"name"`
-	Element Element `yaml:"element" json:"element"`
-	Assert  bool    `yaml:"assert,omitempty" json:"assert,omitempty"`
+	Name               string  `yaml:"name" json:"name"`
+	Element            Element `yaml:"element" json:"element"`
+	Assert             bool    `yaml:"assert,omitempty" json:"assert,omitempty"`
+	SkipOnErrorMessage string  `yaml:"skipOnErrorMessage,omitempty" json:"skipOnErrorMessage,omitempty"`
 	// report attrs
 	message    string
 	errored    bool
@@ -180,7 +181,7 @@ func (w *Web) WithLogger(l log.Logger) *Web {
 }
 
 // Drive runs a single UIStrategy in the same logged in session
-func (web *Web) Drive(ctx context.Context, auth *Auth, allActions []*ViewAction) []error {
+func (web *Web) Drive(ctx context.Context, auth *Auth, allActions []ViewAction) []error {
 	var errs []error
 	// and re-use same browser for all calls
 	// defer web.browser.MustClose()
@@ -194,8 +195,8 @@ func (web *Web) Drive(ctx context.Context, auth *Auth, allActions []*ViewAction)
 
 	// start driving in that session
 	for _, v := range allActions {
-		v = v.WithNavigate(web.config.BaseUrl)
-		if e := page.PerformActions(v); e != nil {
+		vp := &v //.WithNavigate(web.config.BaseUrl)
+		if e := page.PerformActions(vp.WithNavigate(web.config.BaseUrl)); e != nil {
 			errs = append(errs, e)
 		}
 	}
@@ -228,7 +229,8 @@ func (lp *LoggedInPage) PerformActions(action *ViewAction) error {
 		// perform action
 		lp.log.Debugf("starting to perform action: %s", a.Name)
 		// end perform action
-		if skip, e := lp.handleActionError(actionPage, a, lp.performAction(actionPage, a)); e != nil {
+		ap := &a
+		if skip, e := lp.handleActionError(actionPage, ap, lp.performAction(actionPage, ap)); e != nil {
 			if skip {
 				break
 			}
@@ -277,7 +279,9 @@ func (lp *LoggedInPage) navigateHelper(page *rod.Page, action *ViewAction) (*rod
 func (lp *LoggedInPage) ensureIframeLoaded(page *rod.Page, action *ViewAction) (*rod.Page, error) {
 	// allow for extremely slow iframe and page loads
 	// search the page for iframe element and then apply selector
-	page.MustSearch("iframe")
+	if _, err := page.Search(action.Iframe.Selector); err != nil {
+		lp.log.Errorf("not found element with iframe: %v", err.Error())
+	}
 
 	iframe, err := determinActionElement(lp.log, page, Element{Selector: &action.Iframe.Selector})
 	if err != nil {
@@ -354,15 +358,12 @@ func (lp *LoggedInPage) DetermineActionElement(page *rod.Page, action *ElementAc
 // determinActionElement
 func determinActionElement(log log.Loggeriface, page *rod.Page, elem Element) (*rod.Element, error) {
 	log.Debugf("looking for element: %+v", elem)
-	// when timeout is properly implemented
-	// we need to wrap it in Try as it will panic on timeout
-	// err := rod.Try(func() {
-	// })
+
 	if elem.Selector == nil {
-		//
 		return nil, fmt.Errorf("action must include selector")
 	}
 	page.MustWaitLoad()
+
 	type searchElemFunc func(selector string) (rod.Elements, error)
 	searchfuncs := []searchElemFunc{
 		func(selector string) (rod.Elements, error) {
@@ -372,11 +373,9 @@ func determinActionElement(log log.Loggeriface, page *rod.Page, elem Element) (*
 			return page.ElementsX(selector)
 		},
 		// TODO: add more types here e.g. regex
-		// func(selector string) (bool, *rod.Element, error) {
-		// 	return page.HasR(selector)
-		// },
+		// func(selector string) (bool, *rod.Element, error) {return page.HasR(selector)},
 	}
-	// NOTE: shove this in known length channel slice and range over that so that it's done in parallel
+
 	for k, searchEl := range searchfuncs {
 		felems, err := searchEl(*elem.Selector)
 		if err != nil {
@@ -390,7 +389,6 @@ func determinActionElement(log log.Loggeriface, page *rod.Page, elem Element) (*
 		}
 		log.Debugf("not found element using method: %v", k)
 	}
-	// update report with error for step
 	log.Debugf("not found element using any search method")
 	return nil, fmt.Errorf("element not found by selector: %v", *elem.Selector)
 }
@@ -426,6 +424,10 @@ func (lp *LoggedInPage) DetermineActionType(action *ElementAction, elem *rod.Ele
 	// allow - double tap/click, swipe, etc..
 	elem.MustClick()
 	// action hover
+	// // if
+	// if action.SkipOnErrorMessage != "" && {
+	// 	lp.page.Race().Search()
+	// }
 
 	elem.MustWaitLoad() // when clicked we wait for a
 
