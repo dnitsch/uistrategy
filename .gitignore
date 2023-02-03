@@ -20,3 +20,4 @@ dist/
 
 # test
 .coverage
+.DS_Store

@@ -1,4 +1,4 @@
-package uistrategy
+package uistrategy_test
 
 import (
 	"context"
@@ -10,47 +10,48 @@ import (
 	"testing"
 
 	log "github.com/dnitsch/simplelog"
+	"github.com/dnitsch/uistrategy"
 	"github.com/dnitsch/uistrategy/internal/util"
 )
 
 var (
-	testAuth = &Auth{
-		Username: Element{
+	testAuth = &uistrategy.Auth{
+		Username: uistrategy.Element{
 			Must:     true,
 			Value:    util.Str(`test@example.com`),
 			Selector: util.Str(`//*[@class="app-body"]/div[1]/main/div/form/div[2]/input`),
 		},
 		RequireConfirm: true,
-		Password: Element{
+		Password: uistrategy.Element{
 			Must:     true,
 			Value:    util.Str(`P4s$w0rd123!`),
 			Selector: util.Str(`//*[@class="app-body"]/div[1]/main/div/form/div[3]/input`),
 		},
-		ConfirmPassword: Element{
+		ConfirmPassword: uistrategy.Element{
 			Must:     true,
 			Value:    util.Str(`P4s$w0rd123!`),
 			Selector: util.Str(`//*[@class="app-body"]/div[1]/main/div/form/div[4]/input`),
 		},
 		Navigate: `/_/#/login`,
-		Submit: Element{
+		Submit: uistrategy.Element{
 			Must:     true,
 			Selector: util.Str(`#app > div > div > div.page-wrapper.full-page.center-content > main > div > form > button`),
 		},
 	}
-	testActions = []*ViewAction{
+	testActions = []*uistrategy.ViewAction{
 		{
 			Name:     "create test collection",
 			Navigate: `/_/?#/collections`,
-			ElementActions: []ElementAction{{
+			ElementActions: []*uistrategy.ElementAction{{
 				Name: "create new collection",
-				Element: Element{
+				Element: uistrategy.Element{
 					Must:     false,
 					Selector: util.Str(`#app > div > div > div.page-wrapper.center-content > main > div > button`),
 				},
 			},
 				{
 					Name: "Name it test",
-					Element: Element{
+					Element: uistrategy.Element{
 						Must:     false,
 						Selector: util.Str(`body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-header > form > div > input`),
 						Value:    util.Str(`test`),
@@ -59,7 +60,7 @@ var (
 				},
 				{
 					Name: "Save it",
-					Element: Element{
+					Element: uistrategy.Element{
 						Must:     false,
 						Selector: util.Str(`body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-header > form > div > input`),
 						// Value:       util.Str(`test`),
@@ -67,14 +68,14 @@ var (
 				},
 				{
 					Name: "Add New Field",
-					Element: Element{
+					Element: uistrategy.Element{
 						Must:     false,
 						Selector: util.Str(`body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-content > div > div > button`),
 					},
 				},
 				{
 					Name: "Name Field testField1",
-					Element: Element{
+					Element: uistrategy.Element{
 						Must:     false,
 						Selector: util.Str(`body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-content > div > div > div.accordions > div > div > form > div > div:nth-child(2) > div > input`),
 						Value:    util.Str(`testField1`),
@@ -82,14 +83,14 @@ var (
 				},
 				{
 					Name: "Click Done",
-					Element: Element{
+					Element: uistrategy.Element{
 						Must:     false,
 						Selector: util.Str(`body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-content > div > div > div.accordions > div > div > form > div > div.col-sm-4.txt-right > div.inline-flex.flex-gap-sm.flex-nowrap > button.btn.btn-sm.btn-outline.btn-expanded-sm`),
 					},
 				},
 				{
 					Name: "Click Create collection",
-					Element: Element{
+					Element: uistrategy.Element{
 						Must:     false,
 						Selector: util.Str(`body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-footer > button.btn.btn-expanded`),
 					},
@@ -97,27 +98,18 @@ var (
 			},
 		},
 	}
-	testBaseConfig = BaseConfig{BaseUrl: "http://localhost:8090", ContinueOnError: false}
+	testBaseConfig = uistrategy.BaseConfig{BaseUrl: "http://localhost:8090", ContinueOnError: false}
 )
 
 func Test_DoAuth(t *testing.T) {
-	tests := []struct {
-		name string
-		auth *Auth
-	}{
-		{
-			name: "happy path",
-			auth: testAuth,
-		},
-		{
-			name: "no path",
-			auth: &Auth{},
-		},
+	tests := map[string]*uistrategy.Auth{
+		"register path": testAuth,
+		"no auth":       nil,
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ui := New(testBaseConfig).WithLogger(log.New(os.Stderr, log.DebugLvl))
-			p, e := ui.DoAuth(tt.auth)
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			ui := uistrategy.New(testBaseConfig).WithLogger(log.New(os.Stderr, log.DebugLvl))
+			p, e := ui.DoAuth(tt)
 			if e != nil {
 				t.Errorf("wanted %v to be <nil>", e)
 			}
@@ -131,15 +123,15 @@ func Test_Drive(t *testing.T) {
 	l := log.New(os.Stderr, log.DebugLvl)
 	tests := []struct {
 		name string
-		auth *Auth
+		auth *uistrategy.Auth
 
-		actions []*ViewAction
-		web     *Web
+		actions []*uistrategy.ViewAction
+		web     *uistrategy.Web
 	}{
 		{
 			name:    "happy path",
 			auth:    testAuth,
-			web:     New(testBaseConfig).WithLogger(l),
+			web:     uistrategy.New(testBaseConfig).WithLogger(l),
 			actions: testActions,
 		},
 	}
@@ -184,38 +176,38 @@ func Test_NoAuthSimulate(t *testing.T) {
 	l := log.New(os.Stderr, log.DebugLvl)
 	tests := []struct {
 		name string
-		auth *Auth
+		auth *uistrategy.Auth
 
-		actions []*ViewAction
-		web     *Web
+		actions []*uistrategy.ViewAction
+		web     *uistrategy.Web
 	}{
 		{
 			name: "happy path - no error - stop on error",
 			auth: nil,
-			web:  New(BaseConfig{BaseUrl: ts.URL, ContinueOnError: false}).WithLogger(l),
-			actions: []*ViewAction{
+			web:  uistrategy.New(uistrategy.BaseConfig{BaseUrl: ts.URL, ContinueOnError: false}).WithLogger(l),
+			actions: []*uistrategy.ViewAction{
 				{
 					Name:     "create test collection",
 					Navigate: `/route`,
-					ElementActions: []*ElementAction{
+					ElementActions: []*uistrategy.ElementAction{
 						{
 							Name:   "asset collection is created and present in sidebar",
 							Assert: true,
-							Element: Element{
+							Element: uistrategy.Element{
 								Must:     false,
 								Selector: util.Str(`//*[@class='sidebar-content']/*[contains(., 'test')]/span`),
 							},
 						},
 						{
 							Name: "click test collection - just in case",
-							Element: Element{
+							Element: uistrategy.Element{
 								Must:     false,
 								Selector: util.Str(`//*[@class='sidebar-content']/*[contains(., 'test')]/span`),
 							},
 						},
 						{
 							Name: "assert field testField1 is created",
-							Element: Element{
+							Element: uistrategy.Element{
 								Must:     false,
 								Selector: util.Str(`//*[@class='page-wrapper']//span[contains(., 'testField1')]`),
 							},
@@ -227,7 +219,10 @@ func Test_NoAuthSimulate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.web.Drive(context.TODO(), tt.auth, tt.actions)
+			err := tt.web.Drive(context.TODO(), tt.auth, tt.actions)
+			if len(err) > 0 {
+				t.Errorf("got: %v\n\nwant: %v", err, nil)
+			}
 		})
 	}
 }

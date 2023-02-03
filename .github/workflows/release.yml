@@ -1,0 +1,53 @@
+name: release
+
+on:
+  workflow_run:
+    workflows: ['CI']
+    types:
+      - completed
+
+jobs:
+  set-deps-dotnet-poop-here:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    container:
+      image: mcr.microsoft.com/dotnet/sdk:6.0 
+    outputs:
+      semVer: ${{ steps.gitversion.outputs.semVer }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Install GitVersion
+        uses: gittools/actions/gitversion/setup@v0.9.15
+        with:
+          versionSpec: '5.x'
+      - name: Set SemVer Version
+        uses: gittools/actions/gitversion/execute@v0.9.15
+        id: gitversion
+
+      - name: echo VERSIONS
+        run: | 
+          echo "REVISION  -> $GITHUB_SHA"
+          echo "VERSION -> $GITVERSION_SEMVER"
+  release:
+    runs-on: ubuntu-latest
+    container:
+      image: golang:1.19-bullseye
+      env:
+        FOO: Bar
+    needs: set-deps-dotnet-poop-here
+    env:
+      SEMVER: ${{ needs.set-deps-dotnet-poop-here.outputs.semVer }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: install deps
+        run: |
+          apt update && apt install jq -y
+          make REVISION=$GITHUB_SHA install
+      - name: release library
+        run: make GIT_TAG=${SEMVER} REVISION=$GITHUB_SHA tag
+      - name: release binary
+        run: |
+          make REVISION=$GITHUB_SHA GIT_TAG=${SEMVER} PAT=${{ secrets.GITHUB_TOKEN }} build
+          make REVISION=$GITHUB_SHA GIT_TAG=${SEMVER} PAT=${{ secrets.GITHUB_TOKEN }} release

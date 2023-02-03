@@ -5,30 +5,29 @@ import (
 	"os"
 )
 
-func (web *Web) buildReport(allActions []ViewAction) {
+func (web *Web) buildReport(allActions []*ViewAction) {
 
-	vrs := []ViewReport{}
+	vrs := make(ViewReport)
 	for _, v := range allActions {
-		vr := ViewReport{
-			Name:    v.Name,
+		actions := make(ActionsReport)
+		vrs[v.Name] = ViewReportItem{
 			Message: v.message,
+			Actions: actions,
 		}
-		for _, a := range v.ElementActions {
-			va := ActionReport{
-				Name:       a.Name,
-				Message:    a.message,
-				Screenshot: a.screenshot,
-				Errored:    a.errored,
+		for _, ap := range v.ElementActions {
+			vrs[v.Name].Actions[ap.Name] = ActionReportItem{
+				Message:    ap.message,
+				Screenshot: ap.screenshot,
+				Errored:    ap.errored,
+				Output:     ap.capturedOutput,
 			}
-			vr.Actions = append(vr.Actions, va)
 		}
-		vrs = append(vrs, vr)
 	}
 
 	web.flushReport(vrs)
 }
 
-func (web *Web) flushReport(report []ViewReport) error {
+func (web *Web) flushReport(report ViewReport) error {
 	file := `.report/report.json`
 
 	w, err := os.OpenFile(file, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)

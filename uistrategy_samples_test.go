@@ -1,4 +1,4 @@
-package uistrategy
+package uistrategy_test
 
 var testHtml_style = []byte(`<html lang="en"><head><style>.ͼ1.cm-editor.cm-focused {outline: 1px dotted #212121;}
 .ͼ1.cm-editor {position: relative !important; box-sizing: border-box; display: flex !important; flex-direction: column;}

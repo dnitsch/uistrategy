@@ -1,22 +1,30 @@
-package cmdutil
+package cmdutil_test
 
 import (
 	"bytes"
 	"reflect"
 	"testing"
 
+	"github.com/dnitsch/configmanager/pkg/generator"
 	"github.com/dnitsch/uistrategy"
+	"github.com/dnitsch/uistrategy/internal/cmdutil"
 	"github.com/dnitsch/uistrategy/internal/util"
 )
 
-func Test_YamlParse(t *testing.T) {
-	tests := []struct {
+type mockConfManger func(input string, config generator.GenVarsConfig) (string, error)
+
+func (m mockConfManger) RetrieveWithInputReplaced(input string, config generator.GenVarsConfig) (string, error) {
+	return m(input, config)
+}
+
+func TestYamlParse(t *testing.T) {
+	tests := map[string]struct {
 		name         string
 		confContents []byte
+		mockConfMgr  func(t *testing.T) mockConfManger
 		expect       uistrategy.UiStrategyConf
 	}{
-		{
-			name: "all config items",
+		"all config items": {
 			confContents: []byte(`
 setup: 
   baseUrl: http://127.0.0.1:8090
@@ -24,23 +32,20 @@ setup:
 auth:
   navigate: /_/#/login
   username: 
-    must: true
     value: test@example.com
-    xPath: //*[@class="app-body"]/div[1]/main/div/form/div[2]/input
+    selector: //*[@class="app-body"]/div[1]/main/div/form/div[2]/input
   password:
-    must: true
     value: P4s$w0rd123!
-    xPath: //*[@class="app-body"]/div[1]/main/div/form/div[3]/input
+    selector: //*[@class="app-body"]/div[1]/main/div/form/div[3]/input
   submit:
-    must: true
-    cssSelector: '#app > div > div > div.page-wrapper.full-page.center-content > main > div > form > button'    
+    selector: '#app > div > div > div.page-wrapper.full-page.center-content > main > div > form > button'    
 actions:
 - name: create test collection
   navigate: /_/?#/collections
   elementActions: 
   - name: Ceate new collection
     element: 
-      cssSelector: '#app > div > div > div.page-wrapper.center-content > main > div > button'`),
+      selector: '#app > div > div > div.page-wrapper.center-content > main > div > button'`),
 			expect: uistrategy.UiStrategyConf{
 				Setup: uistrategy.BaseConfig{
 					BaseUrl:         "http://127.0.0.1:8090",
@@ -52,26 +57,23 @@ actions:
 					Username: uistrategy.Element{
 						Value:    util.Str("test@example.com"),
 						Timeout:  0,
-						Must:     true,
 						Selector: util.Str(`//*[@class="app-body"]/div[1]/main/div/form/div[2]/input`),
 					},
 					Password: uistrategy.Element{
 						Value:    util.Str("P4s$w0rd123!"),
 						Timeout:  0,
-						Must:     true,
 						Selector: util.Str(`//*[@class="app-body"]/div[1]/main/div/form/div[3]/input`),
 					},
 					Submit: uistrategy.Element{
-						Must:     true,
 						Value:    nil,
 						Timeout:  0,
 						Selector: util.Str(`#app > div > div > div.page-wrapper.full-page.center-content > main > div > form > button`),
 					},
 				},
-				Actions: []uistrategy.ViewAction{{
+				Actions: []*uistrategy.ViewAction{{
 					Name:     "create test collection",
 					Navigate: "/_/?#/collections",
-					ElementActions: []uistrategy.ElementAction{{
+					ElementActions: []*uistrategy.ElementAction{{
 						Name: "Ceate new collection",
 						Element: uistrategy.Element{
 							Selector: util.Str(`#app > div > div > div.page-wrapper.center-content > main > div > button`),
@@ -83,9 +85,33 @@ actions:
 				},
 				},
 			},
+			mockConfMgr: func(t *testing.T) mockConfManger {
+				return mockConfManger(func(input string, config generator.GenVarsConfig) (string, error) {
+					return `
+setup: 
+  baseUrl: http://127.0.0.1:8090
+  continueOnError: true
+auth:
+  navigate: /_/#/login
+  username: 
+    value: test@example.com
+    selector: //*[@class="app-body"]/div[1]/main/div/form/div[2]/input
+  password:
+    value: P4s$w0rd123!
+    selector: //*[@class="app-body"]/div[1]/main/div/form/div[3]/input
+  submit:
+    selector: '#app > div > div > div.page-wrapper.full-page.center-content > main > div > form > button'    
+actions:
+- name: create test collection
+  navigate: /_/?#/collections
+  elementActions: 
+  - name: Ceate new collection
+    element: 
+      selector: '#app > div > div > div.page-wrapper.center-content > main > div > button'`, nil
+				})
+			},
 		},
-		{
-			name: "no auth provided",
+		"no auth provided": {
 			confContents: []byte(`
 setup: 
   baseUrl: http://127.0.0.1:8090  
@@ -95,7 +121,7 @@ actions:
   elementActions: 
   - name: Click MarketPlace
     element: 
-      cssSelector: 'body > div.application-main > main > div.MarketplaceHeader.pt-6.pt-lg-10.position-relative.color-bg-default > div.container-lg.p-responsive.text-center.text-md-left > div > div > a'
+      selector: 'body > div.application-main > main > div.MarketplaceHeader.pt-6.pt-lg-10.position-relative.color-bg-default > div.container-lg.p-responsive.text-center.text-md-left > div > div > a'
 `),
 			expect: uistrategy.UiStrategyConf{
 				Setup: uistrategy.BaseConfig{
@@ -104,11 +130,11 @@ actions:
 					LauncherConfig:  nil,
 				},
 				Auth: nil,
-				Actions: []uistrategy.ViewAction{
+				Actions: []*uistrategy.ViewAction{
 					{
 						Name:     "create new marketplace app",
 						Navigate: "/marketplace",
-						ElementActions: []uistrategy.ElementAction{{
+						ElementActions: []*uistrategy.ElementAction{{
 							Name: "Click MarketPlace",
 							Element: uistrategy.Element{
 								Selector: util.Str(`body > div.application-main > main > div.MarketplaceHeader.pt-6.pt-lg-10.position-relative.color-bg-default > div.container-lg.p-responsive.text-center.text-md-left > div > div > a`),
@@ -120,15 +146,30 @@ actions:
 					},
 				},
 			},
+			mockConfMgr: func(t *testing.T) mockConfManger {
+				return mockConfManger(func(input string, config generator.GenVarsConfig) (string, error) {
+					return `
+setup: 
+  baseUrl: http://127.0.0.1:8090  
+actions:
+  - name: create new marketplace app
+    navigate: /marketplace
+    elementActions: 
+    - name: Click MarketPlace
+      element: 
+        selector: 'body > div.application-main > main > div.MarketplaceHeader.pt-6.pt-lg-10.position-relative.color-bg-default > div.container-lg.p-responsive.text-center.text-md-left > div > div > a'
+`, nil
+				})
+			},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			conf := &uistrategy.UiStrategyConf{}
 
-			err := YamlParseInput(conf, bytes.NewReader(tt.confContents))
+			err := cmdutil.YamlParseInput(conf, bytes.NewReader(tt.confContents), tt.mockConfMgr(t))
 			if err != nil {
-				t.Error(" error parsing")
+				t.Fatalf("failed to parse %q with err: %v", tt.confContents, err.Error())
 			}
 
 			if !reflect.DeepEqual(conf.Setup, tt.expect.Setup) {

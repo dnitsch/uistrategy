@@ -1,6 +1,6 @@
 # Sample application with login
 setup: 
-  baseUrl: http://127.0.0.1:8090
+  baseUrl: http://127.0.0.1:59886 # http://127.0.0.1:8090
   continueOnError: false
   isSinglePageApp: true
 auth:
@@ -9,7 +9,7 @@ auth:
     value: test@example.com
     selector: //*[@class="app-body"]/div[1]/main/div/form/div[2]/input
   password:
-    value: AWSPARAMSTR:///systemX/environment/appY-password
+    value: AWSPARAMSTR:///int-test/pocketbase/admin-pwd
     selector: //*[@class="app-body"]/div[1]/main/div/form/div[3]/input
   submit:
     selector: '#app > div > div > div.page-wrapper.full-page.center-content > main > div > form > button'

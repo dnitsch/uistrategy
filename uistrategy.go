@@ -24,18 +24,21 @@ type Element struct {
 	Timeout  int
 }
 
-type ActionReport struct {
-	Name       string `json:"name"`
-	Screenshot string `json:"screenshot"`
-	Errored    bool   `json:"errored"`
-	Message    string `json:"message"`
+type ActionReportItem struct {
+	Screenshot string   `json:"screenshot"`
+	Errored    bool     `json:"errored"`
+	Message    string   `json:"message"`
+	Output     []string `json:"output"`
 }
 
-type ViewReport struct {
-	Name    string         `json:"name"`
-	Message string         `json:"message"`
-	Actions []ActionReport `json:"actions"`
+type ActionsReport map[string]ActionReportItem
+
+type ViewReportItem struct {
+	Message string        `json:"message"`
+	Actions ActionsReport `json:"actions"`
 }
+
+type ViewReport map[string]ViewReportItem
 
 type LoggedInPage struct {
 	*Web
@@ -57,6 +60,7 @@ type WebConfig struct {
 	UserMode          bool   `yaml:"userMode" json:"userMode"`
 	DataDir           string `yaml:"dataDir" json:"dataDir"`
 	ReuseBrowserCache bool   `yaml:"reuseBrowserCache" json:"reuseBrowserCache"`
+	NoSandbox         bool   `yaml:"noSandbox" json:"noSandbox"`
 }
 
 // BaseConfig is the base config object
@@ -73,8 +77,8 @@ type UiStrategyConf struct {
 	Setup BaseConfig `yaml:"setup" json:"setup"`
 	// Auth is optional
 	// should be omitted for apps that do not require a login
-	Auth    *Auth        `yaml:"auth,omitempty" json:"auth,omitempty"`
-	Actions []ViewAction `yaml:"actions" json:"actions"`
+	Auth    *Auth         `yaml:"auth,omitempty" json:"auth,omitempty"`
+	Actions []*ViewAction `yaml:"actions" json:"actions"`
 }
 
 // ViewAction defines a single action to do
@@ -83,11 +87,11 @@ type UiStrategyConf struct {
 type ViewAction struct {
 	navigate string `yaml:"-" json:"-"`
 	// report attr
-	message        string          `yaml:"-" json:"-"`
-	Iframe         *IframeAction   `yaml:"iframe,omitempty" json:"iframe,omitempty"`
-	Name           string          `yaml:"name" json:"name"`
-	Navigate       string          `yaml:"navigate" json:"navigate"`
-	ElementActions []ElementAction `yaml:"elementActions" json:"elementActions"`
+	message        string           `yaml:"-" json:"-"`
+	Iframe         *IframeAction    `yaml:"iframe,omitempty" json:"iframe,omitempty"`
+	Name           string           `yaml:"name" json:"name"`
+	Navigate       string           `yaml:"navigate" json:"navigate"`
+	ElementActions []*ElementAction `yaml:"elementActions" json:"elementActions"`
 }
 
 // IframeAction
@@ -106,10 +110,12 @@ type ElementAction struct {
 	Element            Element `yaml:"element" json:"element"`
 	Assert             bool    `yaml:"assert,omitempty" json:"assert,omitempty"`
 	SkipOnErrorMessage string  `yaml:"skipOnErrorMessage,omitempty" json:"skipOnErrorMessage,omitempty"`
+	CaptureOutput      bool    `yaml:"captureOutput,omitempty" json:"captureOutput,omitempty"`
 	// report attrs
-	message    string
-	errored    bool
-	screenshot string
+	message        string
+	errored        bool
+	screenshot     string
+	capturedOutput []string
 	// TODO: currently unused
 	// Timeout int     `yaml:"timeout" json:"timeout"`
 	// InputText  *string `yaml:"inputText,omitempty" json:"inputText,omitempty"`
@@ -133,7 +139,7 @@ type Web struct {
 // with the provided BaseConfig
 func New(conf BaseConfig) *Web {
 	_ = util.InitDirDeps()
-	url := newLauncher(conf.LauncherConfig).MustLaunch()
+	url := newLauncher(conf.LauncherConfig).NoSandbox(conf.LauncherConfig.NoSandbox).MustLaunch()
 	browser := rod.New().
 		ControlURL(url).
 		MustConnect().NoDefaultDevice()
@@ -181,7 +187,7 @@ func (w *Web) WithLogger(l log.Logger) *Web {
 }
 
 // Drive runs a single UIStrategy in the same logged in session
-func (web *Web) Drive(ctx context.Context, auth *Auth, allActions []ViewAction) []error {
+func (web *Web) Drive(ctx context.Context, auth *Auth, allActions []*ViewAction) []error {
 	var errs []error
 	// and re-use same browser for all calls
 	// defer web.browser.MustClose()
@@ -195,8 +201,7 @@ func (web *Web) Drive(ctx context.Context, auth *Auth, allActions []ViewAction) 
 
 	// start driving in that session
 	for _, v := range allActions {
-		vp := &v //.WithNavigate(web.config.BaseUrl)
-		if e := page.PerformActions(vp.WithNavigate(web.config.BaseUrl)); e != nil {
+		if e := page.PerformActions(v.WithNavigate(web.config.BaseUrl)); e != nil {
 			errs = append(errs, e)
 		}
 	}
@@ -225,11 +230,10 @@ func (lp *LoggedInPage) PerformActions(action *ViewAction) error {
 
 	actionPage.MustWaitLoad()
 
-	for _, a := range action.ElementActions {
+	for _, ap := range action.ElementActions {
 		// perform action
-		lp.log.Debugf("starting to perform action: %s", a.Name)
+		lp.log.Debugf("starting to perform action: %s", ap.Name)
 		// end perform action
-		ap := &a
 		if skip, e := lp.handleActionError(actionPage, ap, lp.performAction(actionPage, ap)); e != nil {
 			if skip {
 				break
@@ -237,7 +241,7 @@ func (lp *LoggedInPage) PerformActions(action *ViewAction) error {
 			return e
 		}
 		lp.errors = []error{}
-		lp.log.Debugf("completed action: %s", a.Name)
+		lp.log.Debugf("completed action: %s", ap.Name)
 	}
 	return nil
 }
@@ -329,6 +333,19 @@ func (p *LoggedInPage) performAction(page *rod.Page, a *ElementAction) []error {
 	rodElem, err := p.DetermineActionElement(page, a)
 	a.errored = false
 	a.screenshot = ""
+	if rodElem == nil {
+		a.errored = true
+		a.screenshot = p.captureAndSave(page)
+		p.errors = append(p.errors, fmt.Errorf("element not found"))
+		return p.errors
+	}
+	if a.CaptureOutput {
+		html, err := rodElem.HTML()
+		if err != nil {
+			p.errors = append(p.errors, err)
+		}
+		a.capturedOutput = append(a.capturedOutput, html)
+	}
 	if err != nil {
 		p.log.Debugf("action: %s, errored with %+#v", a.Name, err)
 		// extend screenshots here
@@ -403,16 +420,26 @@ func (lp *LoggedInPage) DetermineActionType(action *ElementAction, elem *rod.Ele
 			// TODO: custom errors here
 			return fmt.Errorf("assert set to true. unable to perform action: %+v. element not found", action)
 		}
+
 		// update report with step miss
 		lp.log.Debugf("element not found but ignoring error as assert is set to false")
+
 		return nil
 	}
-	if elem != nil && action.Assert {
-		// update report with step found
-		// item found not performing action
-		lp.log.Debug("assert only returning early")
-		return nil
+
+	if elem != nil {
+		if action.Assert {
+			// update report with step found
+			// item found not performing action
+			lp.log.Debug("only assert only returning early")
+			return nil
+		}
+		if action.CaptureOutput {
+			lp.log.Debug("capturing output only  returning early")
+			return nil
+		}
 	}
+
 	// if Value is present on the actionElement then always give preference
 	if action.Element.Value != nil {
 		lp.log.Debugf("action includes value on actionElement: %v", *action.Element.Value)

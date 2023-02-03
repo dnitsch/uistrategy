@@ -22,7 +22,7 @@ clean:
 
 bingen:
 	for os in darwin linux windows; do \
-		GOOS=$$os CGO_ENABLED=0 go build -a -tags netgo -installsuffix netgo $(LDFLAGS) -o dist/uiseeder-$$os ./cmd; \
+		GOOS=$$os CGO_ENABLED=0 go build -mod=readonly -a -tags netgo -installsuffix netgo $(LDFLAGS) -o dist/uiseeder-$$os ./cmd; \
 	done
 
 build: clean install bingen
@@ -30,8 +30,8 @@ build: clean install bingen
 build_ci: clean install_ci bingen
 
 tag: 
-	git tag "v$(GIT_TAG)"
-	git push origin "v$(GIT_TAG)"
+	git tag -a $(VERSION) -m "ci tag release uistrategy" $(REVISION)
+	git push origin $(VERSION)
 
 release:
 	OWNER=$(OWNER) NAME=$(NAME) PAT=$(PAT) VERSION=$(VERSION) . hack/release.sh 
@@ -42,7 +42,7 @@ btr: build tag release
 
 # TEST
 test: test_prereq
-	go test `go list ./... | grep -v */generated/` -v -mod=readonly -coverprofile=.coverage/out | go-junit-report > .coverage/report-junit.xml && \
+	go test `go list ./... | grep -v */generated/` -v -mod=readonly -race -coverprofile=.coverage/out | go-junit-report > .coverage/report-junit.xml && \
 	gocov convert .coverage/out | gocov-xml > .coverage/report-cobertura.xml
 
 test_ci:
