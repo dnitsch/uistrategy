@@ -1,5 +1,5 @@
 package config
 
 const (
-	SELF_NAME        = "uistratetegy"
+	SELF_NAME = "uistratetegy"
 )

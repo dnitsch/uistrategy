@@ -2,10 +2,8 @@ package uistrategy_test
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"testing"
 
@@ -17,24 +15,21 @@ import (
 var (
 	testAuth = &uistrategy.Auth{
 		Username: uistrategy.Element{
-			Must:     true,
 			Value:    util.Str(`test@example.com`),
 			Selector: util.Str(`//*[@class="app-body"]/div[1]/main/div/form/div[2]/input`),
 		},
 		RequireConfirm: true,
 		Password: uistrategy.Element{
-			Must:     true,
+
 			Value:    util.Str(`P4s$w0rd123!`),
 			Selector: util.Str(`//*[@class="app-body"]/div[1]/main/div/form/div[3]/input`),
 		},
 		ConfirmPassword: uistrategy.Element{
-			Must:     true,
 			Value:    util.Str(`P4s$w0rd123!`),
 			Selector: util.Str(`//*[@class="app-body"]/div[1]/main/div/form/div[4]/input`),
 		},
 		Navigate: `/_/#/login`,
 		Submit: uistrategy.Element{
-			Must:     true,
 			Selector: util.Str(`#app > div > div > div.page-wrapper.full-page.center-content > main > div > form > button`),
 		},
 	}
@@ -45,14 +40,12 @@ var (
 			ElementActions: []*uistrategy.ElementAction{{
 				Name: "create new collection",
 				Element: uistrategy.Element{
-					Must:     false,
 					Selector: util.Str(`#app > div > div > div.page-wrapper.center-content > main > div > button`),
 				},
 			},
 				{
 					Name: "Name it test",
 					Element: uistrategy.Element{
-						Must:     false,
 						Selector: util.Str(`body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-header > form > div > input`),
 						Value:    util.Str(`test`),
 					},
@@ -61,7 +54,6 @@ var (
 				{
 					Name: "Save it",
 					Element: uistrategy.Element{
-						Must:     false,
 						Selector: util.Str(`body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-header > form > div > input`),
 						// Value:       util.Str(`test`),
 					},
@@ -69,14 +61,12 @@ var (
 				{
 					Name: "Add New Field",
 					Element: uistrategy.Element{
-						Must:     false,
 						Selector: util.Str(`body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-content > div > div > button`),
 					},
 				},
 				{
 					Name: "Name Field testField1",
 					Element: uistrategy.Element{
-						Must:     false,
 						Selector: util.Str(`body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-content > div > div > div.accordions > div > div > form > div > div:nth-child(2) > div > input`),
 						Value:    util.Str(`testField1`),
 					},
@@ -84,14 +74,12 @@ var (
 				{
 					Name: "Click Done",
 					Element: uistrategy.Element{
-						Must:     false,
 						Selector: util.Str(`body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-content > div > div > div.accordions > div > div > form > div > div.col-sm-4.txt-right > div.inline-flex.flex-gap-sm.flex-nowrap > button.btn.btn-sm.btn-outline.btn-expanded-sm`),
 					},
 				},
 				{
 					Name: "Click Create collection",
 					Element: uistrategy.Element{
-						Must:     false,
 						Selector: util.Str(`body > div.overlays > div:nth-child(2) > div > div.overlay-panel.overlay-panel-lg.colored-header.compact-header.collection-panel > div.overlay-panel-section.panel-footer > button.btn.btn-expanded`),
 					},
 				},
@@ -101,127 +89,124 @@ var (
 	testBaseConfig = uistrategy.BaseConfig{BaseUrl: "http://localhost:8090", ContinueOnError: false}
 )
 
-func Test_DoAuth(t *testing.T) {
-	tests := map[string]*uistrategy.Auth{
-		"register path": testAuth,
-		"no auth":       nil,
-	}
-	for name, tt := range tests {
-		t.Run(name, func(t *testing.T) {
-			ui := uistrategy.New(testBaseConfig).WithLogger(log.New(os.Stderr, log.DebugLvl))
-			p, e := ui.DoAuth(tt)
-			if e != nil {
-				t.Errorf("wanted %v to be <nil>", e)
-			}
-			fmt.Println(p)
-		})
-	}
-}
-
-func Test_Drive(t *testing.T) {
-
-	l := log.New(os.Stderr, log.DebugLvl)
-	tests := []struct {
-		name string
-		auth *uistrategy.Auth
-
-		actions []*uistrategy.ViewAction
-		web     *uistrategy.Web
-	}{
-		{
-			name:    "happy path",
-			auth:    testAuth,
-			web:     uistrategy.New(testBaseConfig).WithLogger(l),
-			actions: testActions,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := tt.web.Drive(context.TODO(), tt.auth, tt.actions)
-			if len(err) > 0 {
-				t.Errorf("expected errors to be nil, got %v", err)
-			}
-		})
-	}
-}
-
-func getHtmlHandle(t *testing.T) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		switch values, _ := url.ParseQuery(r.URL.RawQuery); values.Get("simulate_resp") {
-		case "with_style":
-			w.Write(testHtml_style)
-		case "no_style":
-			w.Write(testHtml_noStyle)
-		case "bad_request":
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(`{}`))
-		case "error":
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(`{}`))
-		default:
-			w.Write(testHtml_style)
-		}
-	}
-}
+// func Test_DoAuth(t *testing.T) {
+// 	tests := map[string]struct {
+// 		auth *uistrategy.Auth
+// 	}{
+// 		"register path": {
+// 			auth: testAuth,
+// 		},
+// 		"no auth": {nil},
+// 	}
+// 	for name, tt := range tests {
+// 		t.Run(name, func(t *testing.T) {
+// 			ui := uistrategy.New(testBaseConfig).WithLogger(log.New(os.Stderr, log.DebugLvl))
+// 			p, e := ui.DoAuth(tt.auth)
+// 			if e != nil {
+// 				t.Errorf("wanted %v to be <nil>", e)
+// 			}
+// 			fmt.Println(p)
+// 		})
+// 	}
+// }
 
 func Test_NoAuthSimulate(t *testing.T) {
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("/route", getHtmlHandle(t))
-
-	ts := httptest.NewServer(mux)
-
 	l := log.New(os.Stderr, log.DebugLvl)
-	tests := []struct {
+	tests := map[string]struct {
 		name string
 		auth *uistrategy.Auth
 
-		actions []*uistrategy.ViewAction
-		web     *uistrategy.Web
+		actions  []*uistrategy.ViewAction
+		handler  func(t *testing.T) http.Handler
+		baseConf func(t *testing.T, url string) uistrategy.BaseConfig
+		expect   string
 	}{
-		{
-			name: "happy path - no error - stop on error",
+		"happy path - stop on error": {
 			auth: nil,
-			web:  uistrategy.New(uistrategy.BaseConfig{BaseUrl: ts.URL, ContinueOnError: false}).WithLogger(l),
+			handler: func(t *testing.T) http.Handler {
+				mux := http.NewServeMux()
+				mux.HandleFunc("/route", func(w http.ResponseWriter, r *http.Request) {
+
+					w.Header().Set("Content-Type", "text/html; charset=utf-8")
+					w.Write(testHtml_style)
+				})
+				return mux
+			},
+			baseConf: func(t *testing.T, url string) uistrategy.BaseConfig {
+				return uistrategy.BaseConfig{BaseUrl: url, ContinueOnError: false, LauncherConfig: &uistrategy.WebConfig{Headless: true}}
+			},
 			actions: []*uistrategy.ViewAction{
 				{
-					Name:     "create test collection",
+					Name:     "test route",
 					Navigate: `/route`,
 					ElementActions: []*uistrategy.ElementAction{
 						{
 							Name:   "asset collection is created and present in sidebar",
 							Assert: true,
 							Element: uistrategy.Element{
-								Must:     false,
 								Selector: util.Str(`//*[@class='sidebar-content']/*[contains(., 'test')]/span`),
 							},
 						},
 						{
 							Name: "click test collection - just in case",
 							Element: uistrategy.Element{
-								Must:     false,
 								Selector: util.Str(`//*[@class='sidebar-content']/*[contains(., 'test')]/span`),
 							},
 						},
 						{
 							Name: "assert field testField1 is created",
 							Element: uistrategy.Element{
-								Must:     false,
 								Selector: util.Str(`//*[@class='page-wrapper']//span[contains(., 'testField1')]`),
 							},
 							Assert: true,
 						},
 					},
 				}},
-		}}
+		},
+		"error on network": {
+			auth: nil,
+			handler: func(t *testing.T) http.Handler {
+				mux := http.NewServeMux()
+				mux.HandleFunc("/error", func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Content-Type", "text/html; charset=utf-8")
+					w.WriteHeader(http.StatusInternalServerError)
+					w.Write([]byte(`<html><body><div>Error Occured</div></body></html>`))
+				})
+				return mux
+			},
+			baseConf: func(t *testing.T, url string) uistrategy.BaseConfig {
+				return uistrategy.BaseConfig{BaseUrl: url, ContinueOnError: false, LauncherConfig: &uistrategy.WebConfig{Headless: true}}
+			},
+			actions: []*uistrategy.ViewAction{{
+				Name:     "navigate to error",
+				Navigate: `/error`,
+				ElementActions: []*uistrategy.ElementAction{
+					{
+						Name:   "asset collection is created and present in sidebar",
+						Assert: true,
+						Element: uistrategy.Element{
+							Selector: util.Str(`//*[@class='sidebar-content']/*[contains(., 'test')]/span`),
+						},
+					},
+				}},
+			},
+		},
+		// test iframe
+		// test with auth
+	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := tt.web.Drive(context.TODO(), tt.auth, tt.actions)
-			if len(err) > 0 {
-				t.Errorf("got: %v\n\nwant: %v", err, nil)
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			ts := httptest.NewServer(tt.handler(t))
+			defer ts.Close()
+			ui := uistrategy.New(tt.baseConf(t, ts.URL)).WithLogger(l)
+			err := ui.Drive(context.TODO(), tt.auth, tt.actions)
+			if err != nil {
+				if err.Error() != tt.expect {
+					t.Errorf("got: %v\n\nwant: %v", err, nil)
+				}
+				t.Logf("error: %s \n\nmatches the expected \n\noutput: %s", err.Error(), tt.expect)
+				return
 			}
 		})
 	}

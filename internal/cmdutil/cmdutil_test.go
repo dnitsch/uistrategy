@@ -77,7 +77,6 @@ actions:
 						Name: "Ceate new collection",
 						Element: uistrategy.Element{
 							Selector: util.Str(`#app > div > div > div.page-wrapper.center-content > main > div > button`),
-							Must:     false,
 							Timeout:  0,
 							Value:    nil,
 						},
@@ -139,7 +138,6 @@ actions:
 							Element: uistrategy.Element{
 								Selector: util.Str(`body > div.application-main > main > div.MarketplaceHeader.pt-6.pt-lg-10.position-relative.color-bg-default > div.container-lg.p-responsive.text-center.text-md-left > div > div > a`),
 								Timeout:  0,
-								Must:     false,
 								Value:    nil,
 							},
 						}},

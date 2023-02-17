@@ -7,6 +7,7 @@ import (
 	"image/png"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	log "github.com/dnitsch/simplelog"
@@ -20,7 +21,6 @@ type Element struct {
 	// Selector can be a CSSStyle selector or XPath
 	Selector *string `yaml:"selector,omitempty" json:"selector,omitempty"`
 	Value    *string `yaml:"value,omitempty" json:"value,omitempty"`
-	Must     bool    `yaml:"must" json:"must"`
 	Timeout  int
 }
 
@@ -43,7 +43,7 @@ type ViewReport map[string]ViewReportItem
 type LoggedInPage struct {
 	*Web
 	page   *rod.Page
-	errors []error
+	errors UIStrategyError
 	// report []ViewReport
 }
 
@@ -186,9 +186,34 @@ func (w *Web) WithLogger(l log.Logger) *Web {
 	return w
 }
 
+type UIStrategyError struct {
+	errorMap []struct {
+		view    string
+		action  string
+		message string
+	}
+}
+
+func (e *UIStrategyError) setError(view, action, message string) {
+	e.errorMap = append(e.errorMap, struct {
+		view    string
+		action  string
+		message string
+	}{view, action, message})
+}
+
+func (e *UIStrategyError) Error() string {
+	es := []string{"following errors occured:\n"}
+	for _, v := range e.errorMap {
+		es = append(es, fmt.Sprintf("\n\tin view: %s, performing action: %s, failed on: %s", v.view, v.action, v.message))
+	}
+	return strings.Join(es, "")
+}
+
 // Drive runs a single UIStrategy in the same logged in session
-func (web *Web) Drive(ctx context.Context, auth *Auth, allActions []*ViewAction) []error {
-	var errs []error
+// returns a custom error type with details of errors per action
+func (web *Web) Drive(ctx context.Context, auth *Auth, allActions []*ViewAction) error {
+	uiErr := &UIStrategyError{}
 	// and re-use same browser for all calls
 	// defer web.browser.MustClose()
 	defer web.browser.MustClose()
@@ -196,19 +221,20 @@ func (web *Web) Drive(ctx context.Context, auth *Auth, allActions []*ViewAction)
 	// doAuth
 	page, err := web.DoAuth(auth)
 	if err != nil {
-		return []error{err}
+		uiErr.setError("auth", "login", err.Error())
+		return uiErr
 	}
 
 	// start driving in that session
 	for _, v := range allActions {
 		if e := page.PerformActions(v.WithNavigate(web.config.BaseUrl)); e != nil {
-			errs = append(errs, e)
+			uiErr.setError(v.Name, v.Navigate, page.errors.Error())
 		}
 	}
 	// send to report builder here
 	web.buildReport(allActions)
 	// logOut
-	return errs
+	return uiErr
 }
 
 // PerformAction handles a single action on Navigate'd page/view of SPA
