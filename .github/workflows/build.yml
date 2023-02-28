@@ -5,7 +5,7 @@ on:
     branches: [ master, main ]
 
 jobs:
-  set-deps-dotnet-poop-here:
+  set-version:
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/dotnet/sdk:6.0 
@@ -31,9 +31,9 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: golang:1.19-bullseye
-    needs: set-deps-dotnet-poop-here
+    needs: set-version
     env:
-      SEMVER: ${{ needs.set-deps-dotnet-poop-here.outputs.semVer }}
+      SEMVER: ${{ needs.set-version.outputs.semVer }}
     steps:
       - uses: actions/checkout@v3
       - name: install deps
@@ -59,6 +59,6 @@ jobs:
           args:             
             # Unique keys of your project and organization. You can find them in SonarCloud > Information (bottom-left menu)
             # mandatory
-            -Dsonar.projectVersion=$SEMVER
+            -Dsonar.projectVersion=${{ needs.set-version.outputs.semVer }}
+            -Dsonar.go.tests.reportPaths=/github/workspace/.coverage/report-junit.xml
             -Dsonar.go.coverage.reportPaths=/github/workspace/.coverage/out
-            -X
