@@ -186,6 +186,8 @@ func (w *Web) WithLogger(l log.Logger) *Web {
 	return w
 }
 
+// UIStrategyError custom error handler
+// TODO: enable mutex lock on this just in case
 type UIStrategyError struct {
 	errorMap []struct {
 		view    string
@@ -203,11 +205,14 @@ func (e *UIStrategyError) setError(view, action, message string) {
 }
 
 func (e *UIStrategyError) Error() string {
-	es := []string{"following errors occured:\n"}
-	for _, v := range e.errorMap {
-		es = append(es, fmt.Sprintf("\n\tin view: %s, performing action: %s, failed on: %s", v.view, v.action, v.message))
+	if len(e.errorMap) > 0 {
+		es := []string{"following errors occured:\n"}
+		for _, v := range e.errorMap {
+			es = append(es, fmt.Sprintf("\n\tin view: %s, performing action: %s, failed on: %s", v.view, v.action, v.message))
+		}
+		return strings.Join(es, "")
 	}
-	return strings.Join(es, "")
+	return ""
 }
 
 // Drive runs a single UIStrategy in the same logged in session
@@ -227,14 +232,15 @@ func (web *Web) Drive(ctx context.Context, auth *Auth, allActions []*ViewAction)
 
 	// start driving in that session
 	for _, v := range allActions {
-		if e := page.PerformActions(v.WithNavigate(web.config.BaseUrl)); e != nil {
-			uiErr.setError(v.Name, v.Navigate, page.errors.Error())
+		if err := page.PerformActions(v.WithNavigate(web.config.BaseUrl)); err != nil {
+			// returning on error if ContinueOnError was not specified
+			return err
 		}
 	}
 	// send to report builder here
 	web.buildReport(allActions)
 	// logOut
-	return uiErr
+	return &page.errors
 }
 
 // PerformAction handles a single action on Navigate'd page/view of SPA
@@ -266,7 +272,6 @@ func (lp *LoggedInPage) PerformActions(action *ViewAction) error {
 			}
 			return e
 		}
-		lp.errors = []error{}
 		lp.log.Debugf("completed action: %s", ap.Name)
 	}
 	return nil
@@ -338,37 +343,37 @@ func (lp *LoggedInPage) ensureIframeLoaded(page *rod.Page, action *ViewAction) (
 }
 
 // handleActionError returns a skip error and error depending on config set up
-func (p *LoggedInPage) handleActionError(page *rod.Page, a *ElementAction, err []error) (bool, error) {
+func (p *LoggedInPage) handleActionError(page *rod.Page, a *ElementAction, err UIStrategyError) (bool, error) {
 
-	if len(err) > 0 && p.config.ContinueOnError {
+	if len(err.errorMap) > 0 && p.config.ContinueOnError {
 		p.log.Debugf("action: %#v, errored with %v", a, err)
 		p.log.Debugf("continue on error...")
 		a.errored = true
 		a.screenshot = p.captureAndSave(page)
 		return true, nil
 	}
-	if len(err) > 0 {
-		return false, fmt.Errorf("%+v", err)
+	if len(err.errorMap) > 0 {
+		return false, &err
 	}
 	return false, nil
 }
 
 // performAction handles finding the element and any related actions on it
 // i.e. click or input
-func (p *LoggedInPage) performAction(page *rod.Page, a *ElementAction) []error {
+func (p *LoggedInPage) performAction(page *rod.Page, a *ElementAction) UIStrategyError {
 	rodElem, err := p.DetermineActionElement(page, a)
 	a.errored = false
 	a.screenshot = ""
 	if rodElem == nil {
 		a.errored = true
 		a.screenshot = p.captureAndSave(page)
-		p.errors = append(p.errors, fmt.Errorf("element not found"))
+		p.errors.setError(a.Name, *a.Element.Selector, "element not found")
 		return p.errors
 	}
 	if a.CaptureOutput {
 		html, err := rodElem.HTML()
 		if err != nil {
-			p.errors = append(p.errors, err)
+			p.errors.setError(a.Name, *a.Element.Selector, fmt.Sprintf("failed to capture the output: %v", err))
 		}
 		a.capturedOutput = append(a.capturedOutput, html)
 	}
@@ -378,7 +383,7 @@ func (p *LoggedInPage) performAction(page *rod.Page, a *ElementAction) []error {
 		a.message = fmt.Sprintf("locating element with selector: %s, errored with %+#v", *a.Element.Selector, err)
 		a.errored = true
 		a.screenshot = p.captureAndSave(page)
-		p.errors = append(p.errors, err)
+		p.errors.setError(a.Name, *a.Element.Selector, err.Error())
 	}
 	a.message = fmt.Sprintf("found element: %s", *a.Element.Selector)
 	if err := p.DetermineActionType(a, rodElem); err != nil {
@@ -386,7 +391,7 @@ func (p *LoggedInPage) performAction(page *rod.Page, a *ElementAction) []error {
 		a.message = fmt.Sprintf("performing action on element with selector: %s, errored with %+v", *a.Element.Selector, err)
 		a.errored = true
 		a.screenshot = p.captureAndSave(page)
-		p.errors = append(p.errors, err)
+		p.errors.setError(a.Name, *a.Element.Selector, err.Error())
 	}
 
 	// also add results to Report outcome

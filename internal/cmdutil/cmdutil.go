@@ -15,8 +15,8 @@ type ConfManager interface {
 }
 
 func RunActions(ui *uistrategy.Web, conf *uistrategy.UiStrategyConf) error {
-	if err := ui.Drive(context.Background(), conf.Auth, conf.Actions); len(err) > 0 {
-		return fmt.Errorf("%+v", err)
+	if err := ui.Drive(context.Background(), conf.Auth, conf.Actions); len(err.Error()) > 0 {
+		return fmt.Errorf(err.Error())
 	}
 	return nil
 }

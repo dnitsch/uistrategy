@@ -22,7 +22,7 @@ clean:
 
 bingen:
 	for os in darwin linux windows; do \
-		GOOS=$$os CGO_ENABLED=0 go build -mod=readonly -a -tags netgo -installsuffix netgo $(LDFLAGS) -o dist/uiseeder-$$os ./cmd; \
+		GOOS=$$os CGO_ENABLED=0 go build -mod=readonly -buildvcs=false $(LDFLAGS) -o dist/uiseeder-$$os ./cmd; \
 	done
 
 build: clean install bingen

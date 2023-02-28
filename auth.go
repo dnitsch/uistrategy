@@ -27,7 +27,7 @@ func (web *Web) DoAuth(auth *Auth) (*LoggedInPage, error) {
 	}
 	page := web.browser.MustPage(web.config.BaseUrl).MustWaitLoad()
 
-	lp := &LoggedInPage{web, page, []error{}}
+	lp := &LoggedInPage{web, page, UIStrategyError{}}
 	return lp, nil
 }
 
@@ -35,7 +35,7 @@ func (web *Web) DoAuth(auth *Auth) (*LoggedInPage, error) {
 func (web *Web) doLocalAuth(auth Auth) (*LoggedInPage, error) {
 
 	page := web.browser.MustPage(web.config.BaseUrl + auth.Navigate).MustWaitLoad()
-	lp := &LoggedInPage{web, page, []error{}}
+	lp := &LoggedInPage{web, page, UIStrategyError{}}
 
 	web.log.Debug("begin auth")
 	if err := web.sharedLoginForm(page, auth); err != nil {
@@ -52,7 +52,7 @@ func (web *Web) doLocalAuth(auth Auth) (*LoggedInPage, error) {
 func (web *Web) doIdpAuth(auth Auth) (*LoggedInPage, error) {
 
 	page := web.browser.MustPage(web.config.BaseUrl + auth.Navigate).MustWaitLoad()
-	lp := &LoggedInPage{web, page, []error{}}
+	lp := &LoggedInPage{web, page, UIStrategyError{}}
 
 	web.log.Debug("begin auth")
 
