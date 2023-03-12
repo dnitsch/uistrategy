@@ -1,6 +1,10 @@
 package uistrategy
 
-import "github.com/go-rod/rod"
+import (
+	"fmt"
+
+	"github.com/go-rod/rod"
+)
 
 type Auth struct {
 	Username        Element  `yaml:"username" json:"username"`
@@ -50,6 +54,9 @@ func (web *Web) doLocalAuth(auth Auth) (*LoggedInPage, error) {
 // SP initiated will be simpler as you can omit the idpUrl
 // the flow will follow redirects
 func (web *Web) doIdpAuth(auth Auth) (*LoggedInPage, error) {
+	if auth.IdpSelector == nil {
+		return nil, fmt.Errorf("idpSelector must be specified")
+	}
 
 	page := web.browser.MustPage(web.config.BaseUrl + auth.Navigate).MustWaitLoad()
 	lp := &LoggedInPage{web, page, UIStrategyError{}}
@@ -58,7 +65,7 @@ func (web *Web) doIdpAuth(auth Auth) (*LoggedInPage, error) {
 
 	idpSelect, err := determinActionElement(lp.log, page, *auth.IdpSelector)
 	if err != nil {
-		web.log.Errorf("unable to find IdpSelector field, by selector: %v", *auth.IdpSelector.Selector)
+		web.log.Errorf("unable to find IdpSelector field, by selector: %v, error: %v", auth.IdpSelector.Selector, err.Error())
 		return nil, err
 	}
 	idpSelect.MustClick()

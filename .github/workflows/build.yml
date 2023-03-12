@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: install deps
         run: |
-          apt update && apt install jq -y
+          apt-get update && apt-get install jq chromium -y
           make REVISION=$GITHUB_SHA install
       - name: make test 
         run: |

@@ -139,7 +139,7 @@ type Web struct {
 // with the provided BaseConfig
 func New(conf BaseConfig) *Web {
 	_ = util.InitDirDeps()
-	url := newLauncher(conf.LauncherConfig).NoSandbox(conf.LauncherConfig.NoSandbox).MustLaunch()
+	url := newLauncher(conf.LauncherConfig).MustLaunch()
 	browser := rod.New().
 		ControlURL(url).
 		MustConnect().NoDefaultDevice()
@@ -174,6 +174,9 @@ func newLauncher(webconf *WebConfig) *launcher.Launcher {
 		}
 		if webconf.Headless {
 			l.Headless(true)
+		}
+		if webconf.NoSandbox {
+			l.NoSandbox(webconf.NoSandbox)
 		}
 	}
 
@@ -215,6 +218,10 @@ func (e *UIStrategyError) Error() string {
 	return ""
 }
 
+func (e *UIStrategyError) hasError() bool {
+	return len(e.errorMap) > 0
+}
+
 // Drive runs a single UIStrategy in the same logged in session
 // returns a custom error type with details of errors per action
 func (web *Web) Drive(ctx context.Context, auth *Auth, allActions []*ViewAction) error {
@@ -240,7 +247,11 @@ func (web *Web) Drive(ctx context.Context, auth *Auth, allActions []*ViewAction)
 	// send to report builder here
 	web.buildReport(allActions)
 	// logOut
-	return &page.errors
+	// return errors to caller for visibility if any
+	if page.errors.hasError() {
+		return &page.errors
+	}
+	return nil
 }
 
 // PerformAction handles a single action on Navigate'd page/view of SPA

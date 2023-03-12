@@ -2,7 +2,6 @@ package cmdutil
 
 import (
 	"context"
-	"fmt"
 	"io"
 
 	"github.com/dnitsch/configmanager"
@@ -15,10 +14,7 @@ type ConfManager interface {
 }
 
 func RunActions(ui *uistrategy.Web, conf *uistrategy.UiStrategyConf) error {
-	if err := ui.Drive(context.Background(), conf.Auth, conf.Actions); len(err.Error()) > 0 {
-		return fmt.Errorf(err.Error())
-	}
-	return nil
+	return ui.Drive(context.Background(), conf.Auth, conf.Actions)
 }
 
 // YamlParseInput will return a filled pointer with Unmarshalled data

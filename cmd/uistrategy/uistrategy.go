@@ -18,7 +18,7 @@ var (
 		Use:   "uistrategy",
 		RunE:  runActions,
 		Short: "executes a series of actions against a setup config",
-		Long:  ``,
+		Long:  `executes a series of instructions against a any number of paths under the same host. supports multiple login options - basic/Idp/MFA e.g. `,
 	}
 )
 
