@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+    <title>Page Title</title>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.3/jquery.min.js"></script>
+    <style>
+        button {
+            color: aqua;
+        }
+    </style>
+</head>
+<body>
+    <button id="idp-login">ID LoginP</button>
+    <div id="login-form" style="display: none;">
+        <input id="username"/>
+        <input id="password"/>
+        <button id="submit">Login</button>
+    </div>
+    <div id="mfa-container" style="display: none">
+        <button id="mfa">MFA</button>
+    </div>
+</body>
+<script>
+    $('#idp-login').click(function() {
+        $('#idp-login').css({
+            visibility: "hidden",
+            display: "none"
+        });
+        $('#login-form').css({
+            display: "block"
+        })
+    });
+    $('#submit').click(function() {
+        $('#login-form').css({display: "none"})
+        $('#mfa-container').css({display: "block"})
+    })
+    $('#mfa').click(() => {
+        setTimeout(() => {
+            $('#mfa').css({display: "none"})
+        }, 1000)
+    })
+</script>
+</html>
