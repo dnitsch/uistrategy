@@ -1,3 +1,9 @@
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=dnitsch_uistrategy&metric=bugs)](https://sonarcloud.io/summary/new_code?id=dnitsch_uistrategy)
+[![Technical Debt](https://sonarcloud.io/api/project_badges/measure?project=dnitsch_uistrategy&metric=sqale_index)](https://sonarcloud.io/summary/new_code?id=dnitsch_uistrategy)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=dnitsch_uistrategy&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=dnitsch_uistrategy)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=dnitsch_uistrategy&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=dnitsch_uistrategy)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=dnitsch_uistrategy&metric=coverage)](https://sonarcloud.io/summary/new_code?id=dnitsch_uistrategy)
+
 # UI Strategy - Beta
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/dnitsch/uistrategy)](https://goreportcard.com/report/github.com/dnitsch/uistrategy)
