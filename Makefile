@@ -25,6 +25,9 @@ bingen:
 		GOOS=$$os CGO_ENABLED=0 go build -mod=readonly -buildvcs=false $(LDFLAGS) -o dist/uiseeder-$$os ./cmd; \
 	done
 
+bingen_darwin_arm:
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -mod=readonly -buildvcs=false $(LDFLAGS) -o dist/uiseeder-darwin-arm ./cmd;
+
 build: clean install bingen
 
 build_ci: clean install_ci bingen

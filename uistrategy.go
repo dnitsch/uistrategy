@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"image/png"
+	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -34,8 +36,9 @@ type ActionReportItem struct {
 type ActionsReport map[string]ActionReportItem
 
 type ViewReportItem struct {
-	Message string        `json:"message"`
-	Actions ActionsReport `json:"actions"`
+	Message                   string         `json:"message"`
+	CapturedHeaderRequestKeys map[string]any `json:"capturedHeaderReqKeys"`
+	Actions                   ActionsReport  `json:"actions"`
 }
 
 type ViewReport map[string]ViewReportItem
@@ -71,6 +74,7 @@ type BaseConfig struct {
 	LauncherConfig  *WebConfig `yaml:"browserConfig,omitempty" json:"browserConfig,omitempty"`
 	ContinueOnError bool       `yaml:"continueOnError" json:"continueOnError"`
 	IsSinglePageApp bool       `yaml:"isSinglePageApp" json:"isSinglePageApp"`
+	WriteReport     bool       `yaml:"writeReport" json:"writeReport"`
 }
 
 type UiStrategyConf struct {
@@ -87,11 +91,13 @@ type UiStrategyConf struct {
 type ViewAction struct {
 	navigate string `yaml:"-" json:"-"`
 	// report attr
-	message        string           `yaml:"-" json:"-"`
-	Iframe         *IframeAction    `yaml:"iframe,omitempty" json:"iframe,omitempty"`
-	Name           string           `yaml:"name" json:"name"`
-	Navigate       string           `yaml:"navigate" json:"navigate"`
-	ElementActions []*ElementAction `yaml:"elementActions" json:"elementActions"`
+	message               string           `yaml:"-" json:"-"`
+	capturedReqHeaders    map[string]any   `yaml:"-" json:"-"`
+	Iframe                *IframeAction    `yaml:"iframe,omitempty" json:"iframe,omitempty"`
+	Name                  string           `yaml:"name" json:"name"`
+	Navigate              string           `yaml:"navigate" json:"navigate"`
+	CaptureRequestHeaders []string         `yaml:"captureRequestHeaders" json:"captureRequestHeaders"`
+	ElementActions        []*ElementAction `yaml:"elementActions" json:"elementActions"`
 }
 
 // IframeAction
@@ -133,6 +139,7 @@ type Web struct {
 	browser *rod.Browser
 	log     log.Loggeriface
 	config  BaseConfig
+	output  io.Writer
 }
 
 // New returns an initialised instance of Web struct
@@ -148,6 +155,11 @@ func New(conf BaseConfig) *Web {
 		browser: browser,
 		config:  conf,
 	}
+}
+
+func (w *Web) WithWriter(writer io.Writer) *Web {
+	w.output = writer
+	return w
 }
 
 // newLauncher returns a launcher with specified properties
@@ -224,7 +236,7 @@ func (e *UIStrategyError) hasError() bool {
 
 // Drive runs a single UIStrategy in the same logged in session
 // returns a custom error type with details of errors per action
-func (web *Web) Drive(ctx context.Context, auth *Auth, allActions []*ViewAction) error {
+func (web *Web) Drive(ctx context.Context, auth *Auth, allActions []*ViewAction) ([]*ViewAction, error) {
 	uiErr := &UIStrategyError{}
 	// and re-use same browser for all calls
 	// defer web.browser.MustClose()
@@ -234,24 +246,21 @@ func (web *Web) Drive(ctx context.Context, auth *Auth, allActions []*ViewAction)
 	page, err := web.DoAuth(auth)
 	if err != nil {
 		uiErr.setError("auth", "login", err.Error())
-		return uiErr
+		return allActions, uiErr
 	}
 
 	// start driving in that session
 	for _, v := range allActions {
 		if err := page.PerformActions(v.WithNavigate(web.config.BaseUrl)); err != nil {
 			// returning on error if ContinueOnError was not specified
-			return err
+			return allActions, err
 		}
 	}
-	// send to report builder here
-	web.buildReport(allActions)
-	// logOut
 	// return errors to caller for visibility if any
 	if page.errors.hasError() {
-		return &page.errors
+		return allActions, &page.errors
 	}
-	return nil
+	return allActions, nil
 }
 
 // PerformAction handles a single action on Navigate'd page/view of SPA
@@ -291,6 +300,7 @@ func (lp *LoggedInPage) PerformActions(action *ViewAction) error {
 // navigateHelper ensures page is navigated to and waited sufficient time to ensure
 func (lp *LoggedInPage) navigateHelper(page *rod.Page, action *ViewAction) (*rod.Page, error) {
 	lp.log.Debug(page.MustInfo().URL)
+
 	//
 	targetUrl, err := url.Parse(action.navigate)
 	if err != nil {
@@ -303,10 +313,16 @@ func (lp *LoggedInPage) navigateHelper(page *rod.Page, action *ViewAction) (*rod
 	lp.log.Debugf("targetUrl: %v", targetUrl)
 	lp.log.Debugf("currentUrl: %v", currentUrl)
 
+	// set request hijack in background
+	if len(action.CaptureRequestHeaders) > 0 {
+		go func(lp *LoggedInPage, action *ViewAction) {
+			defer lp.captureHeaders(action)
+		}(lp, action)
+	}
 	// classic applications need to perform full page postbacks
 	// more often than SPAs
 	// There is a isSPA flag - but currently not used
-	if currentUrl.Path != targetUrl.Path {
+	if strings.EqualFold(currentUrl.Path, targetUrl.Path) {
 		waitNav := page.MustWaitNavigation()
 		page.MustNavigate(action.navigate)
 		waitNav()
@@ -318,6 +334,27 @@ func (lp *LoggedInPage) navigateHelper(page *rod.Page, action *ViewAction) (*rod
 	action.message = fmt.Sprintf("successfully navigated to: %s", action.navigate)
 
 	return page, nil
+}
+
+func (lp *LoggedInPage) captureHeaders(action *ViewAction) func() {
+	router := lp.browser.HijackRequests()
+	// defer router.MustStop()
+	router.MustAdd(action.navigate, func(ctx *rod.Hijack) {
+		_ = ctx.LoadResponse(http.DefaultClient, true)
+		headerMap := make(map[string]any)
+		for _, v := range action.CaptureRequestHeaders {
+			for hkey, hval := range ctx.Request.Headers() {
+				if strings.EqualFold(strings.ToLower(v), strings.ToLower(hkey)) {
+					headerMap[v] = hval
+				}
+			}
+		}
+		action.capturedReqHeaders = headerMap
+	})
+
+	go router.Run()
+
+	return router.MustStop
 }
 
 // ensureIframeLoaded returns an instnace of a pointer to a rod.Page
@@ -404,7 +441,7 @@ func (p *LoggedInPage) performAction(page *rod.Page, a *ElementAction) UIStrateg
 		a.screenshot = p.captureAndSave(page)
 		p.errors.setError(a.Name, *a.Element.Selector, err.Error())
 	}
-
+	p.page.WaitRequestIdle(5*time.Second, []string{p.config.BaseUrl}, []string{}, []proto.NetworkResourceType{})
 	// also add results to Report outcome
 	return p.errors
 }

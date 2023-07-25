@@ -145,12 +145,11 @@ func Test_NoAuthSimulate(t *testing.T) {
 			ts := httptest.NewServer(tt.handler(t))
 			defer ts.Close()
 			ui := uistrategy.New(tt.baseConf(t, ts.URL)).WithLogger(l)
-			err := ui.Drive(context.TODO(), tt.auth, tt.actions)
+			_, err := ui.Drive(context.TODO(), tt.auth, tt.actions)
 			if err != nil {
 				if err.Error() != tt.expect {
 					t.Errorf("got: %v\n\nwant: %v", err, nil)
 				}
-				// t.Logf("error: %s \n\nmatches the expected \n\noutput: %s", err.Error(), tt.expect)
 				return
 			}
 		})
