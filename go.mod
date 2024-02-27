@@ -1,6 +1,6 @@
 module github.com/dnitsch/uistrategy
 
-go 1.20
+go 1.21
 
 require (
 	github.com/dnitsch/configmanager v1.19.1
@@ -98,4 +98,3 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-// replace github.com/dnitsch/configmanager v1.10.0 => ../configmanager

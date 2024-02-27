@@ -23,7 +23,6 @@ type Element struct {
 	// Selector can be a CSSStyle selector or XPath
 	Selector *string `yaml:"selector,omitempty" json:"selector,omitempty"`
 	Value    *string `yaml:"value,omitempty" json:"value,omitempty"`
-	Timeout  int
 }
 
 type ActionReportItem struct {
@@ -117,6 +116,8 @@ type ElementAction struct {
 	Assert             bool    `yaml:"assert,omitempty" json:"assert,omitempty"`
 	SkipOnErrorMessage string  `yaml:"skipOnErrorMessage,omitempty" json:"skipOnErrorMessage,omitempty"`
 	CaptureOutput      bool    `yaml:"captureOutput,omitempty" json:"captureOutput,omitempty"`
+	// Timeout in seconds to cancel the action if unable to MustClick or MustInput
+	Timeout int `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 	// report attrs
 	message        string
 	errored        bool
@@ -491,7 +492,7 @@ func determinActionElement(log log.Loggeriface, page *rod.Page, elem Element) (*
 
 // DetermineActionType returns the rod.Element with correct action
 // either Click/Swipe or Input
-// when Input is selected - ensure you have specified the input HTML element
+// when Input is selected - ensure you have specified the input/clickable HTML element
 // as the enclosing elements may not always allow for input...
 func (lp *LoggedInPage) DetermineActionType(action *ElementAction, elem *rod.Element) error {
 	if elem == nil {
@@ -506,11 +507,19 @@ func (lp *LoggedInPage) DetermineActionType(action *ElementAction, elem *rod.Ele
 		return nil
 	}
 
+	if action.Timeout > 0 {
+		ctx := context.Background()
+		cctx, cancel := context.WithTimeout(ctx, time.Duration(action.Timeout*int(time.Second)))
+		defer cancel()
+		elem = elem.Context(cctx)
+	}
+
 	if elem != nil {
 		if action.Assert {
 			// update report with step found
 			// item found not performing action
 			lp.log.Debug("only assert only returning early")
+			
 			return nil
 		}
 		if action.CaptureOutput {

@@ -56,17 +56,14 @@ actions:
 					Navigate: "/_/#/login",
 					Username: uistrategy.Element{
 						Value:    util.Str("test@example.com"),
-						Timeout:  0,
 						Selector: util.Str(`//*[@class="app-body"]/div[1]/main/div/form/div[2]/input`),
 					},
 					Password: uistrategy.Element{
 						Value:    util.Str("P4s$w0rd123!"),
-						Timeout:  0,
 						Selector: util.Str(`//*[@class="app-body"]/div[1]/main/div/form/div[3]/input`),
 					},
 					Submit: uistrategy.Element{
 						Value:    nil,
-						Timeout:  0,
 						Selector: util.Str(`#app > div > div > div.page-wrapper.full-page.center-content > main > div > form > button`),
 					},
 				},
@@ -77,7 +74,6 @@ actions:
 						Name: "Ceate new collection",
 						Element: uistrategy.Element{
 							Selector: util.Str(`#app > div > div > div.page-wrapper.center-content > main > div > button`),
-							Timeout:  0,
 							Value:    nil,
 						},
 					}},
@@ -137,7 +133,6 @@ actions:
 							Name: "Click MarketPlace",
 							Element: uistrategy.Element{
 								Selector: util.Str(`body > div.application-main > main > div.MarketplaceHeader.pt-6.pt-lg-10.position-relative.color-bg-default > div.container-lg.p-responsive.text-center.text-md-left > div > div > a`),
-								Timeout:  0,
 								Value:    nil,
 							},
 						}},

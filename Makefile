@@ -43,10 +43,17 @@ release:
 btr: build tag release
 	echo "ran build tag release"
 
-# TEST
-test: test_prereq
-	go test ./... -v -mod=readonly -race -coverprofile=.coverage/out | go-junit-report > .coverage/report-junit.xml && \
+test_unit_run: test_prereq
+	go test ./... -timeout 30s -v -mod=readonly -race -coverprofile=.coverage/out > .coverage/test.out
+
+test_coverage: 
 	gocov convert .coverage/out | gocov-xml > .coverage/report-cobertura.xml
+
+test_unit_report:
+	go-junit-report -in .coverage/test.out > .coverage/report-junit.xml
+
+# TEST
+test: test_unit_run test_coverage test_unit_report
 
 test_ci:
 	go test ./... -mod=readonly
