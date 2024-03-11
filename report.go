@@ -5,17 +5,21 @@ import (
 )
 
 func (web *Web) BuildReport(allActions []*ViewAction) ViewReport {
+	vr := make(ViewReport)
 
-	vrs := make(ViewReport)
-	for _, v := range allActions {
+	if !web.config.WriteReport {
+		return vr
+	}
+
+	for _, action := range allActions {
 		actions := make(ActionsReport)
-		vrs[v.Name] = ViewReportItem{
-			Message:                   v.message,
-			CapturedHeaderRequestKeys: v.capturedReqHeaders,
+		vr[action.Name] = ViewReportItem{
+			Message:                   action.message,
+			CapturedHeaderRequestKeys: action.capturedReqHeaders,
 			Actions:                   actions,
 		}
-		for _, ap := range v.ElementActions {
-			vrs[v.Name].Actions[ap.Name] = ActionReportItem{
+		for _, ap := range action.ElementActions {
+			vr[action.Name].Actions[ap.Name] = ActionReportItem{
 				Message:    ap.message,
 				Screenshot: ap.screenshot,
 				Errored:    ap.errored,
@@ -23,10 +27,11 @@ func (web *Web) BuildReport(allActions []*ViewAction) ViewReport {
 			}
 		}
 	}
-	if web.config.WriteReport {
-		web.flushReport(vrs)
+
+	if err := web.flushReport(vr); err != nil {
+		web.log.Errorf("failed to write report with: %s", err)
 	}
-	return vrs
+	return vr
 }
 
 func (web *Web) flushReport(report ViewReport) error {
