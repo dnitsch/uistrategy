@@ -519,7 +519,7 @@ func (lp *LoggedInPage) DetermineActionType(action *ElementAction, elem *rod.Ele
 			// update report with step found
 			// item found not performing action
 			lp.log.Debug("only assert only returning early")
-			
+
 			return nil
 		}
 		if action.CaptureOutput {
@@ -538,13 +538,8 @@ func (lp *LoggedInPage) DetermineActionType(action *ElementAction, elem *rod.Ele
 	// TODO: expand this into a more switch statement type implementation
 	// allow - double tap/click, swipe, etc..
 	elem.MustClick()
-	// action hover
-	// // if
-	// if action.SkipOnErrorMessage != "" && {
-	// 	lp.page.Race().Search()
-	// }
 
-	elem.MustWaitLoad() // when clicked we wait for a
+	elem.MustWaitLoad() // when clicked we wait for a loadEvent
 
 	return nil
 }
@@ -572,22 +567,3 @@ func (lp *LoggedInPage) captureAndSave(page *rod.Page) string {
 	}
 	return file
 }
-
-// // DoRegistration performs the required registration
-// // currently unused but will be a special dispensation
-// // for when the UI run of actions will require a registration of users
-// func (web *Web) DoRegistration(auth Auth) (*LoggedInPage, error) {
-
-// 	util.WriteDataDir(*web.datadir)
-
-// 	page := web.browser.MustPage(auth.Navigate)
-// 	lp := &LoggedInPage{page, web.browser, web.log}
-// 	// determine which selector is available special case for AuthHandler
-// 	determinActionElement(lp, auth.Username).MustInput(*auth.Username.Value)
-// 	determinActionElement(lp, auth.Password).MustInput(*auth.Password.Value)
-// 	if auth.RequireConfirm {
-// 		determinActionElement(lp, auth.ConfirmPassword).MustInput(*auth.ConfirmPassword.Value)
-// 	}
-// 	determinActionElement(lp, auth.Submit).MustClick()
-// 	return lp, nil
-// }
