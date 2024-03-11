@@ -25,6 +25,9 @@ bingen:
 		GOOS=$$os CGO_ENABLED=0 go build -mod=readonly -buildvcs=false $(LDFLAGS) -o dist/uiseeder-$$os ./cmd; \
 	done
 
+bingen_darwin_arm:
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -mod=readonly -buildvcs=false $(LDFLAGS) -o dist/uiseeder-darwin-arm ./cmd;
+
 build: clean install bingen
 
 build_ci: clean install_ci bingen
@@ -40,10 +43,17 @@ release:
 btr: build tag release
 	echo "ran build tag release"
 
-# TEST
-test: test_prereq
-	go test ./... -v -mod=readonly -race -coverprofile=.coverage/out | go-junit-report > .coverage/report-junit.xml && \
+test_unit_run: test_prereq
+	go test ./... -timeout 30s -v -mod=readonly -race -coverprofile=.coverage/out > .coverage/test.out; exit 0
+
+test_coverage: 
 	gocov convert .coverage/out | gocov-xml > .coverage/report-cobertura.xml
+
+test_unit_report:
+	go-junit-report -in .coverage/test.out > .coverage/report-junit.xml
+
+# TEST
+test: test_unit_run test_coverage test_unit_report
 
 test_ci:
 	go test ./... -mod=readonly

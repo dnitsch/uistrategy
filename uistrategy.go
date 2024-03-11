@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"image/png"
+	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -21,7 +23,6 @@ type Element struct {
 	// Selector can be a CSSStyle selector or XPath
 	Selector *string `yaml:"selector,omitempty" json:"selector,omitempty"`
 	Value    *string `yaml:"value,omitempty" json:"value,omitempty"`
-	Timeout  int
 }
 
 type ActionReportItem struct {
@@ -34,8 +35,9 @@ type ActionReportItem struct {
 type ActionsReport map[string]ActionReportItem
 
 type ViewReportItem struct {
-	Message string        `json:"message"`
-	Actions ActionsReport `json:"actions"`
+	Message                   string         `json:"message"`
+	CapturedHeaderRequestKeys map[string]any `json:"capturedHeaderReqKeys"`
+	Actions                   ActionsReport  `json:"actions"`
 }
 
 type ViewReport map[string]ViewReportItem
@@ -71,6 +73,7 @@ type BaseConfig struct {
 	LauncherConfig  *WebConfig `yaml:"browserConfig,omitempty" json:"browserConfig,omitempty"`
 	ContinueOnError bool       `yaml:"continueOnError" json:"continueOnError"`
 	IsSinglePageApp bool       `yaml:"isSinglePageApp" json:"isSinglePageApp"`
+	WriteReport     bool       `yaml:"writeReport" json:"writeReport"`
 }
 
 type UiStrategyConf struct {
@@ -87,11 +90,13 @@ type UiStrategyConf struct {
 type ViewAction struct {
 	navigate string `yaml:"-" json:"-"`
 	// report attr
-	message        string           `yaml:"-" json:"-"`
-	Iframe         *IframeAction    `yaml:"iframe,omitempty" json:"iframe,omitempty"`
-	Name           string           `yaml:"name" json:"name"`
-	Navigate       string           `yaml:"navigate" json:"navigate"`
-	ElementActions []*ElementAction `yaml:"elementActions" json:"elementActions"`
+	message               string           `yaml:"-" json:"-"`
+	capturedReqHeaders    map[string]any   `yaml:"-" json:"-"`
+	Iframe                *IframeAction    `yaml:"iframe,omitempty" json:"iframe,omitempty"`
+	Name                  string           `yaml:"name" json:"name"`
+	Navigate              string           `yaml:"navigate" json:"navigate"`
+	CaptureRequestHeaders []string         `yaml:"captureRequestHeaders" json:"captureRequestHeaders"`
+	ElementActions        []*ElementAction `yaml:"elementActions" json:"elementActions"`
 }
 
 // IframeAction
@@ -111,6 +116,8 @@ type ElementAction struct {
 	Assert             bool    `yaml:"assert,omitempty" json:"assert,omitempty"`
 	SkipOnErrorMessage string  `yaml:"skipOnErrorMessage,omitempty" json:"skipOnErrorMessage,omitempty"`
 	CaptureOutput      bool    `yaml:"captureOutput,omitempty" json:"captureOutput,omitempty"`
+	// Timeout in seconds to cancel the action if unable to MustClick or MustInput
+	Timeout int `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 	// report attrs
 	message        string
 	errored        bool
@@ -133,6 +140,7 @@ type Web struct {
 	browser *rod.Browser
 	log     log.Loggeriface
 	config  BaseConfig
+	output  io.Writer
 }
 
 // New returns an initialised instance of Web struct
@@ -148,6 +156,11 @@ func New(conf BaseConfig) *Web {
 		browser: browser,
 		config:  conf,
 	}
+}
+
+func (w *Web) WithWriter(writer io.Writer) *Web {
+	w.output = writer
+	return w
 }
 
 // newLauncher returns a launcher with specified properties
@@ -224,7 +237,7 @@ func (e *UIStrategyError) hasError() bool {
 
 // Drive runs a single UIStrategy in the same logged in session
 // returns a custom error type with details of errors per action
-func (web *Web) Drive(ctx context.Context, auth *Auth, allActions []*ViewAction) error {
+func (web *Web) Drive(ctx context.Context, auth *Auth, allActions []*ViewAction) ([]*ViewAction, error) {
 	uiErr := &UIStrategyError{}
 	// and re-use same browser for all calls
 	// defer web.browser.MustClose()
@@ -234,24 +247,21 @@ func (web *Web) Drive(ctx context.Context, auth *Auth, allActions []*ViewAction)
 	page, err := web.DoAuth(auth)
 	if err != nil {
 		uiErr.setError("auth", "login", err.Error())
-		return uiErr
+		return allActions, uiErr
 	}
 
 	// start driving in that session
 	for _, v := range allActions {
 		if err := page.PerformActions(v.WithNavigate(web.config.BaseUrl)); err != nil {
 			// returning on error if ContinueOnError was not specified
-			return err
+			return allActions, err
 		}
 	}
-	// send to report builder here
-	web.buildReport(allActions)
-	// logOut
 	// return errors to caller for visibility if any
 	if page.errors.hasError() {
-		return &page.errors
+		return allActions, &page.errors
 	}
-	return nil
+	return allActions, nil
 }
 
 // PerformAction handles a single action on Navigate'd page/view of SPA
@@ -291,6 +301,7 @@ func (lp *LoggedInPage) PerformActions(action *ViewAction) error {
 // navigateHelper ensures page is navigated to and waited sufficient time to ensure
 func (lp *LoggedInPage) navigateHelper(page *rod.Page, action *ViewAction) (*rod.Page, error) {
 	lp.log.Debug(page.MustInfo().URL)
+
 	//
 	targetUrl, err := url.Parse(action.navigate)
 	if err != nil {
@@ -303,10 +314,16 @@ func (lp *LoggedInPage) navigateHelper(page *rod.Page, action *ViewAction) (*rod
 	lp.log.Debugf("targetUrl: %v", targetUrl)
 	lp.log.Debugf("currentUrl: %v", currentUrl)
 
+	// set request hijack in background
+	if len(action.CaptureRequestHeaders) > 0 {
+		go func(lp *LoggedInPage, action *ViewAction) {
+			defer lp.captureHeaders(action)
+		}(lp, action)
+	}
 	// classic applications need to perform full page postbacks
 	// more often than SPAs
 	// There is a isSPA flag - but currently not used
-	if currentUrl.Path != targetUrl.Path {
+	if strings.EqualFold(currentUrl.Path, targetUrl.Path) {
 		waitNav := page.MustWaitNavigation()
 		page.MustNavigate(action.navigate)
 		waitNav()
@@ -318,6 +335,27 @@ func (lp *LoggedInPage) navigateHelper(page *rod.Page, action *ViewAction) (*rod
 	action.message = fmt.Sprintf("successfully navigated to: %s", action.navigate)
 
 	return page, nil
+}
+
+func (lp *LoggedInPage) captureHeaders(action *ViewAction) func() {
+	router := lp.browser.HijackRequests()
+	// defer router.MustStop()
+	router.MustAdd(action.navigate, func(ctx *rod.Hijack) {
+		_ = ctx.LoadResponse(http.DefaultClient, true)
+		headerMap := make(map[string]any)
+		for _, v := range action.CaptureRequestHeaders {
+			for hkey, hval := range ctx.Request.Headers() {
+				if strings.EqualFold(strings.ToLower(v), strings.ToLower(hkey)) {
+					headerMap[v] = hval
+				}
+			}
+		}
+		action.capturedReqHeaders = headerMap
+	})
+
+	go router.Run()
+
+	return router.MustStop
 }
 
 // ensureIframeLoaded returns an instnace of a pointer to a rod.Page
@@ -404,7 +442,7 @@ func (p *LoggedInPage) performAction(page *rod.Page, a *ElementAction) UIStrateg
 		a.screenshot = p.captureAndSave(page)
 		p.errors.setError(a.Name, *a.Element.Selector, err.Error())
 	}
-
+	p.page.WaitRequestIdle(5*time.Second, []string{p.config.BaseUrl}, []string{}, []proto.NetworkResourceType{})
 	// also add results to Report outcome
 	return p.errors
 }
@@ -454,7 +492,7 @@ func determinActionElement(log log.Loggeriface, page *rod.Page, elem Element) (*
 
 // DetermineActionType returns the rod.Element with correct action
 // either Click/Swipe or Input
-// when Input is selected - ensure you have specified the input HTML element
+// when Input is selected - ensure you have specified the input/clickable HTML element
 // as the enclosing elements may not always allow for input...
 func (lp *LoggedInPage) DetermineActionType(action *ElementAction, elem *rod.Element) error {
 	if elem == nil {
@@ -469,11 +507,19 @@ func (lp *LoggedInPage) DetermineActionType(action *ElementAction, elem *rod.Ele
 		return nil
 	}
 
+	if action.Timeout > 0 {
+		ctx := context.Background()
+		cctx, cancel := context.WithTimeout(ctx, time.Duration(action.Timeout*int(time.Second)))
+		defer cancel()
+		elem = elem.Context(cctx)
+	}
+
 	if elem != nil {
 		if action.Assert {
 			// update report with step found
 			// item found not performing action
 			lp.log.Debug("only assert only returning early")
+
 			return nil
 		}
 		if action.CaptureOutput {
@@ -492,13 +538,8 @@ func (lp *LoggedInPage) DetermineActionType(action *ElementAction, elem *rod.Ele
 	// TODO: expand this into a more switch statement type implementation
 	// allow - double tap/click, swipe, etc..
 	elem.MustClick()
-	// action hover
-	// // if
-	// if action.SkipOnErrorMessage != "" && {
-	// 	lp.page.Race().Search()
-	// }
 
-	elem.MustWaitLoad() // when clicked we wait for a
+	elem.MustWaitLoad() // when clicked we wait for a loadEvent
 
 	return nil
 }
@@ -526,22 +567,3 @@ func (lp *LoggedInPage) captureAndSave(page *rod.Page) string {
 	}
 	return file
 }
-
-// // DoRegistration performs the required registration
-// // currently unused but will be a special dispensation
-// // for when the UI run of actions will require a registration of users
-// func (web *Web) DoRegistration(auth Auth) (*LoggedInPage, error) {
-
-// 	util.WriteDataDir(*web.datadir)
-
-// 	page := web.browser.MustPage(auth.Navigate)
-// 	lp := &LoggedInPage{page, web.browser, web.log}
-// 	// determine which selector is available special case for AuthHandler
-// 	determinActionElement(lp, auth.Username).MustInput(*auth.Username.Value)
-// 	determinActionElement(lp, auth.Password).MustInput(*auth.Password.Value)
-// 	if auth.RequireConfirm {
-// 		determinActionElement(lp, auth.ConfirmPassword).MustInput(*auth.ConfirmPassword.Value)
-// 	}
-// 	determinActionElement(lp, auth.Submit).MustClick()
-// 	return lp, nil
-// }

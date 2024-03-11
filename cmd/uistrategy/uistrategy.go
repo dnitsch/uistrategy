@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"io"
 	"os"
 
 	"github.com/dnitsch/configmanager"
@@ -14,6 +15,7 @@ import (
 var (
 	path    string
 	verbose bool
+	output  string
 	rootCmd = &cobra.Command{
 		Use:   "uistrategy",
 		RunE:  runActions,
@@ -32,6 +34,7 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 	rootCmd.PersistentFlags().StringVarP(&path, "input", "i", "", "Path to the input file containing the config definition for the UIStrategy")
+	rootCmd.PersistentFlags().StringVarP(&output, "ouput-path", "p", ".report/report.json", "Path to output if report ")
 }
 
 // runActions parses and executes the provided actions
@@ -47,7 +50,11 @@ func runActions(cmd *cobra.Command, args []string) error {
 	if err := cmdutil.YamlParseInput(conf, f, cm); err != nil {
 		return err
 	}
-	ui := uistrategy.New(conf.Setup).WithLogger(logger(verbose))
+	w, err := getWriter(output)
+	if err != nil {
+		return err
+	}
+	ui := uistrategy.New(conf.Setup).WithLogger(logger(verbose)).WithWriter(w)
 
 	return cmdutil.RunActions(ui, conf)
 }
@@ -57,4 +64,11 @@ func logger(verbose bool) log.Logger {
 		return log.New(os.Stderr, log.DebugLvl)
 	}
 	return log.New(os.Stderr, log.ErrorLvl)
+}
+
+func getWriter(out string) (io.Writer, error) {
+	if out == "stdout" {
+		return os.Stdout, nil
+	}
+	return os.OpenFile(out, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
 }

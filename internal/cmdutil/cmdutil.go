@@ -14,7 +14,13 @@ type ConfManager interface {
 }
 
 func RunActions(ui *uistrategy.Web, conf *uistrategy.UiStrategyConf) error {
-	return ui.Drive(context.Background(), conf.Auth, conf.Actions)
+	actions, err := ui.Drive(context.Background(), conf.Auth, conf.Actions)
+	if err != nil {
+		return err
+	}
+	// write report
+	ui.BuildReport(actions)
+	return nil
 }
 
 // YamlParseInput will return a filled pointer with Unmarshalled data
